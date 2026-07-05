@@ -287,6 +287,7 @@ export default function App() {
   const onElementMouseDown = useCallback((e, el) => {
     if (tool === 'edittext') {
       if (el.type === 'edit') {
+        e.preventDefault()
         e.stopPropagation()
         const line = linesById[el.lineId]
         if (line) startLineEdit(line, null, null)
@@ -809,6 +810,10 @@ function PageView({ page, doc, zoom, tool, elements, linesById, selectedId, edit
                   height: (line.height + 4) * zoom,
                 }}
                 onMouseDown={(e) => {
+                  // preventDefault stops the browser's focus-change default
+                  // action, which would otherwise blur (and instantly close)
+                  // the editor input mounted by this click.
+                  e.preventDefault()
                   e.stopPropagation()
                   on.lineClick(line, canvasRef.current, page)
                 }}

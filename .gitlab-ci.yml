@@ -4,12 +4,20 @@ stages:
 
 build:
   stage: build
-  image: node:20-alpine
   tags:
     - app-primary
   only:
     - main
   script:
+    - |
+      if ! command -v npm >/dev/null 2>&1; then
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates curl
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+      fi
+    - node --version
+    - npm --version
     - npm ci
     - npm run build
   artifacts:

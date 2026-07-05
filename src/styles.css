@@ -44,6 +44,7 @@ body {
   letter-spacing: -0.02em;
   margin-right: 4px;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .brand img {

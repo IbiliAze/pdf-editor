@@ -9,6 +9,16 @@ npm install
 npm run dev
 ```
 
+## Deploy
+
+The GitLab pipeline builds the Vite app, copies `dist/` to
+`/opt/pdf-editor/dist` on the manager, deploys the `pdf-editor` swarm stack, and
+installs `pdf-editor.conf` into the shared nginx proxy.
+
+- **URL:** https://pdf-editor.eightmile.co.uk
+- **Network:** joins the shared `monitoring-network` overlay so the proxy can
+  reach it by name (`pdf-editor:80`).
+
 ## Features
 
 - **Edit text** (the core feature): click any text on the page, type the replacement, press Enter. Works on any PDF regardless of how its fonts are encoded — the original run is covered with a rectangle in the sampled background color and the replacement is drawn at the exact original baseline with a matched standard font (family/bold/italic detected from the PDF font name). Clear the box to erase a line entirely.

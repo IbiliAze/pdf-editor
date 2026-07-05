@@ -1,0 +1,31 @@
+# PDF editor — static React build served by nginx. Reached only via the reverse
+# proxy on the shared overlay (monitoring-network); it publishes NO host ports.
+#
+# Deploy on the manager:
+#   docker stack deploy -c docker-compose.yml pdf-editor
+#
+# Then install the nginx site (see README.md):
+#   sudo cp pdf-editor.conf /opt/stacks/proxy/conf.d/
+#   docker exec $(docker ps -q -f name=proxy_nginx) nginx -t && \
+#   docker exec $(docker ps -q -f name=proxy_nginx) nginx -s reload
+
+services:
+  pdf-editor:
+    image: nginx:1.27-alpine
+    volumes:
+      - /opt/pdf-editor/dist:/usr/share/nginx/html:ro
+    networks:
+      - monitoring-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          # The built app is a bind mount on the manager's filesystem.
+          - node.role == manager
+
+networks:
+  # Created by the swarm/monitoring setup; shared with the reverse proxy so it
+  # can reach this service by name (pdf-editor:80).
+  monitoring-network:
+    external: true

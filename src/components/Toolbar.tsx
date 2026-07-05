@@ -38,10 +38,10 @@ export default function Toolbar({
 }: ToolbarProps) {
   return (
     <header className="toolbar">
-      <div className="brand">
+      <a className="brand" href="https://eightmile.co.uk">
         <img src="/logo-inverted-removebg-preview.png" alt="Eight Mile logo" />
         Eight Mile
-      </div>
+      </a>
 
       <button className="btn" onClick={onOpen}>
         Open

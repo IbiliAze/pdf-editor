@@ -1,0 +1,35 @@
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: node:20-alpine
+  tags:
+    - app-primary
+  only:
+    - main
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+
+deploy:
+  stage: deploy
+  tags:
+    - app-primary
+  only:
+    - main
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - sudo mkdir -p /opt/pdf-editor/dist
+    - sudo cp -a dist/. /opt/pdf-editor/dist/
+    - docker stack deploy -c docker-compose.yml pdf-editor
+    - sudo cp pdf-editor.conf /opt/stacks/proxy/conf.d/
+    - docker exec $(docker ps -q -f name=proxy_nginx) nginx -t
+    - docker exec $(docker ps -q -f name=proxy_nginx) nginx -s reload

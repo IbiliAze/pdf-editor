@@ -35,7 +35,7 @@ export default function ElementView({
       <div
         className={`el-whiteout${isSelected ? ' selected' : ''}`}
         style={{ left: el.x * zoom, top: el.y * zoom, width: el.w * zoom, height: el.h * zoom }}
-        onMouseDown={(e) => on.elementMouseDown(e, el)}
+        onPointerDown={(e) => on.elementPointerDown(e, el)}
       />
     )
   }
@@ -51,7 +51,7 @@ export default function ElementView({
           height: el.h * zoom,
           background: el.color,
         }}
-        onMouseDown={(e) => on.elementMouseDown(e, el)}
+        onPointerDown={(e) => on.elementPointerDown(e, el)}
       />
     )
   }
@@ -68,7 +68,7 @@ export default function ElementView({
           strokeLinejoin="round"
           className={isSelected ? 'selected-vector' : ''}
           style={{ pointerEvents: tool === 'select' ? 'stroke' : 'none' }}
-          onMouseDown={(e) => on.elementMouseDown(e, el)}
+          onPointerDown={(e) => on.elementPointerDown(e, el)}
         />
       </svg>
     )
@@ -84,7 +84,7 @@ export default function ElementView({
     return (
       <div
         className={`edit-cover${isSelected ? ' selected' : ''}`}
-        onMouseDown={(e) => on.elementMouseDown(e, el)}
+        onPointerDown={(e) => on.elementPointerDown(e, el)}
         style={{
           left: (line.x - 1) * zoom,
           top: (line.top - 1) * zoom,
@@ -119,7 +119,7 @@ export default function ElementView({
         spellCheck={false}
         onChange={(e) => on.elementTextChange(el.id, e.target.value)}
         onBlur={() => on.finishElementEdit(el.id)}
-        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') on.finishElementEdit(el.id)
         }}
@@ -139,7 +139,7 @@ export default function ElementView({
   return (
     <div
       className={`text-el${isSelected ? ' selected' : ''}`}
-      onMouseDown={(e) => on.elementMouseDown(e, el)}
+      onPointerDown={(e) => on.elementPointerDown(e, el)}
       onDoubleClick={(e) => {
         e.stopPropagation()
         on.elementDoubleClick(el)
@@ -156,7 +156,7 @@ export default function ElementView({
     >
       {el.text || ' '}
       {isSelected && tool === 'select' && (
-        <div className="resize-handle" onMouseDown={(e) => on.resizeMouseDown(e, el)} />
+        <div className="resize-handle" onPointerDown={(e) => on.resizePointerDown(e, el)} />
       )}
     </div>
   )

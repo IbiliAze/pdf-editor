@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 
 export type FontFamily = 'Helvetica' | 'Times' | 'Courier'
 
@@ -128,18 +128,21 @@ export interface Status {
   msg: string
 }
 
-/** Callbacks PageView and its children invoke; implemented in App.tsx. */
+/**
+ * Callbacks PageView and its children invoke; implemented in App.tsx.
+ * Pointer events (not mouse events) so touch input works on mobile.
+ */
 export interface PageHandlers {
-  pageMouseDown: (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => void
-  pageMouseMove: (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => void
-  pageMouseUp: () => void
-  pageMouseLeave: () => void
+  pagePointerDown: (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => void
+  pagePointerMove: (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => void
+  pagePointerUp: () => void
+  pagePointerLeave: () => void
   lineClick: (line: Line, canvas: HTMLCanvasElement | null, page: PageInfo | null) => void
   lineEditChange: (text: string) => void
   commitLineEdit: () => void
   cancelLineEdit: () => void
-  elementMouseDown: (e: ReactMouseEvent, el: EditorElement) => void
-  resizeMouseDown: (e: ReactMouseEvent, el: TextElement) => void
+  elementPointerDown: (e: ReactPointerEvent, el: EditorElement) => void
+  resizePointerDown: (e: ReactPointerEvent, el: TextElement) => void
   elementDoubleClick: (el: EditorElement) => void
   elementTextChange: (id: number, text: string) => void
   finishElementEdit: (id: number) => void

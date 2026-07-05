@@ -34,9 +34,11 @@ export default function LineEditor({ editing, line, zoom, on }: LineEditorProps)
       className="line-editor"
       value={editing.text}
       spellCheck={false}
+      autoFocus
+      enterKeyHint="done"
       onChange={(e) => on.lineEditChange(e.target.value)}
       onBlur={() => on.commitLineEdit()}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault()

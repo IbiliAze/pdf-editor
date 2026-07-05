@@ -98,10 +98,10 @@ export default function PageView({
         <canvas ref={canvasRef} style={{ width: w, height: h }} />
         <div
           className={`overlay tool-${tool}`}
-          onMouseDown={(e) => on.pageMouseDown(e, page)}
-          onMouseMove={(e) => on.pageMouseMove(e, page)}
-          onMouseUp={() => on.pageMouseUp()}
-          onMouseLeave={() => on.pageMouseLeave()}
+          onPointerDown={(e) => on.pagePointerDown(e, page)}
+          onPointerMove={(e) => on.pagePointerMove(e, page)}
+          onPointerUp={() => on.pagePointerUp()}
+          onPointerLeave={() => on.pagePointerLeave()}
         >
           {pageElements.map((el) => (
             <ElementView
@@ -157,14 +157,15 @@ export default function PageView({
                     width: (line.width + 4) * zoom,
                     height: (line.height + 4) * zoom,
                   }}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     // preventDefault stops the browser's focus-change default
                     // action, which would otherwise blur (and instantly close)
-                    // the editor input mounted by this click.
+                    // the editor input mounted by this tap/click.
                     e.preventDefault()
                     e.stopPropagation()
                     on.lineClick(line, canvasRef.current, page)
                   }}
+                  onMouseDown={(e) => e.preventDefault()}
                 />
               ),
             )}

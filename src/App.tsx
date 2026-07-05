@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import Toolbar from './components/Toolbar'
 import PageView from './components/PageView'
 import { useElements } from './hooks/useElements'
@@ -81,13 +81,20 @@ export default function App() {
       if (!file) return
       setStatus(null)
       try {
-        await pdf.open(file)
+        const pages = await pdf.open(file)
         els.reset()
         setSelectedId(null)
         setEditing(null)
         setEditingElId(null)
         setLiveDraw(null)
         setToolState('edittext')
+        // Fit the page to the viewport on small screens; cap at the
+        // comfortable desktop default.
+        const first = pages[0]
+        if (first) {
+          const avail = document.documentElement.clientWidth - 24
+          setZoom(clamp(Math.min(1.25, avail / first.width), 0.4, 1.25))
+        }
       } catch (err) {
         setStatus({ type: 'error', msg: `Could not open PDF: ${(err as Error)?.message ?? err}` })
       }
@@ -185,15 +192,15 @@ export default function App() {
   // ---- page pointer handlers ----
 
   const localPoint = useCallback(
-    (e: ReactMouseEvent<HTMLElement>) => {
+    (e: ReactPointerEvent<HTMLElement>) => {
       const r = e.currentTarget.getBoundingClientRect()
       return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }
     },
     [zoom],
   )
 
-  const onPageMouseDown = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => {
+  const onPagePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => {
       if (editingRef.current) {
         commitLineEdit()
         return
@@ -229,8 +236,8 @@ export default function App() {
     [tool, addTextAt, localPoint, commitLineEdit, setLiveDraw, textStyle.color],
   )
 
-  const onPageMouseMove = useCallback(
-    (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => {
+  const onPagePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => {
       const d = liveDrawRef.current
       if (!d || d.pageIndex !== page.pageIndex) return
       const pt = localPoint(e)
@@ -252,8 +259,8 @@ export default function App() {
     if (r.w > 2 && r.h > 2) els.commit((prev) => [...prev, r])
   }, [els, setLiveDraw])
 
-  const onElementMouseDown = useCallback(
-    (e: ReactMouseEvent, el: EditorElement) => {
+  const onElementPointerDown = useCallback(
+    (e: ReactPointerEvent, el: EditorElement) => {
       if (tool === 'edittext') {
         if (el.type === 'edit') {
           // preventDefault stops the browser's focus-change default action,
@@ -281,8 +288,8 @@ export default function App() {
     [tool, linesById, startLineEdit, els],
   )
 
-  const onResizeMouseDown = useCallback(
-    (e: ReactMouseEvent, el: TextElement) => {
+  const onResizePointerDown = useCallback(
+    (e: ReactPointerEvent, el: TextElement) => {
       e.stopPropagation()
       setSelectedId(el.id)
       dragRef.current = {
@@ -301,7 +308,7 @@ export default function App() {
   // Window-level drag: move/resize the pressed element; history is pushed
   // once, on the first actual movement.
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const d = dragRef.current
       if (!d) return
       if (!d.moved) {
@@ -327,11 +334,13 @@ export default function App() {
     const onUp = () => {
       dragRef.current = null
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
   }, [zoom, els])
 
@@ -440,13 +449,16 @@ export default function App() {
     [selectedId, els],
   )
 
-  const zoomStep = useCallback(
-    (dir: 1 | -1) => {
-      const i = ZOOM_LEVELS.findIndex((z) => Math.abs(z - zoom) < 0.01)
-      setZoom(ZOOM_LEVELS[clamp((i === -1 ? 2 : i) + dir, 0, ZOOM_LEVELS.length - 1)])
-    },
-    [zoom],
-  )
+  // Zoom can be an arbitrary fit-to-width value, so step to the nearest
+  // preset level in the requested direction.
+  const zoomStep = useCallback((dir: 1 | -1) => {
+    setZoom((z) => {
+      if (dir === 1) {
+        return ZOOM_LEVELS.find((l) => l > z + 0.01) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
+      }
+      return [...ZOOM_LEVELS].reverse().find((l) => l < z - 0.01) ?? ZOOM_LEVELS[0]
+    })
+  }, [])
 
   const handleExport = useCallback(async () => {
     commitLineEdit()
@@ -478,18 +490,18 @@ export default function App() {
   )
 
   const handlers: PageHandlers = {
-    pageMouseDown: onPageMouseDown,
-    pageMouseMove: onPageMouseMove,
-    pageMouseUp: commitLiveDraw,
-    pageMouseLeave: commitLiveDraw,
+    pagePointerDown: onPagePointerDown,
+    pagePointerMove: onPagePointerMove,
+    pagePointerUp: commitLiveDraw,
+    pagePointerLeave: commitLiveDraw,
     lineClick: startLineEdit,
     lineEditChange: (text) => {
       if (editingRef.current) setEditing({ ...editingRef.current, text })
     },
     commitLineEdit,
     cancelLineEdit: () => setEditing(null),
-    elementMouseDown: onElementMouseDown,
-    resizeMouseDown: onResizeMouseDown,
+    elementPointerDown: onElementPointerDown,
+    resizePointerDown: onResizePointerDown,
     elementDoubleClick: (el) => {
       if (el.type !== 'text') return
       els.snapshotHistory()

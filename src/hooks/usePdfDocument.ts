@@ -16,8 +16,11 @@ export function usePdfDocument() {
   const bytesRef = useRef<ArrayBuffer | null>(null)
   const docRef = useRef<PDFDocumentProxy | null>(null)
 
-  /** Load a file, replacing the current document. Throws on failure. */
-  const open = useCallback(async (file: File): Promise<void> => {
+  /**
+   * Load a file, replacing the current document. Throws on failure.
+   * Resolves with the parsed pages (also set into state).
+   */
+  const open = useCallback(async (file: File): Promise<PageInfo[]> => {
     setLoading(true)
     try {
       const buf = await file.arrayBuffer()
@@ -50,6 +53,7 @@ export function usePdfDocument() {
       docRef.current = doc
       setPages(list)
       setFileName(file.name.replace(/\.pdf$/i, ''))
+      return list
     } finally {
       setLoading(false)
     }

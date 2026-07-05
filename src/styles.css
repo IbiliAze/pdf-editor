@@ -18,7 +18,9 @@ body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
+  /* stable height on mobile browsers with collapsing URL bars */
+  height: 100dvh;
 }
 
 /* ---------- toolbar ---------- */
@@ -83,6 +85,8 @@ body {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  /* no double-tap zoom delay on touch */
+  touch-action: manipulation;
 }
 
 .btn:hover:not(:disabled) {
@@ -262,6 +266,9 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
+  /* stop long-press text selection / callouts on touch */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .overlay.tool-edittext { cursor: default; }
@@ -269,6 +276,32 @@ body {
 .overlay.tool-whiteout,
 .overlay.tool-highlight,
 .overlay.tool-pen { cursor: crosshair; }
+
+/* Drawing tools consume touch gestures (no scrolling while drawing);
+   other tools leave panning/scrolling to the browser. */
+.overlay.tool-whiteout,
+.overlay.tool-highlight,
+.overlay.tool-pen {
+  touch-action: none;
+}
+
+/* Draggable elements need their touch gestures too. */
+.tool-select .text-el,
+.tool-select .el-whiteout,
+.tool-select .el-highlight,
+.resize-handle {
+  touch-action: none;
+}
+
+.line-hit {
+  touch-action: manipulation;
+}
+
+.line-editor,
+.text-el.editing {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 /* ---------- elements ---------- */
 
@@ -383,4 +416,81 @@ body {
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
   cursor: ew-resize;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 960px) {
+  .tool-label {
+    display: none;
+  }
+
+  .btn.tool {
+    padding: 7px 9px;
+  }
+
+  .tool-icon {
+    width: auto;
+  }
+
+  .doc-label {
+    display: none;
+  }
+
+  .hintbar {
+    font-size: 11.5px;
+    padding: 5px 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .toolbar {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .btn {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .btn.primary {
+    padding: 6px 10px;
+  }
+
+  .toolbar select {
+    max-width: 90px;
+    padding: 5px 4px;
+  }
+
+  .toolbar input[type='number'] {
+    width: 42px;
+  }
+
+  .toolbar input[type='color'] {
+    width: 28px;
+  }
+
+  .zoom-label {
+    min-width: 34px;
+    font-size: 11px;
+  }
+
+  .workspace {
+    padding: 12px 8px;
+    gap: 18px;
+  }
+
+  .empty {
+    margin: auto 14px;
+    padding: 34px 22px;
+  }
+
+  .empty h2 {
+    font-size: 17px;
+  }
 }

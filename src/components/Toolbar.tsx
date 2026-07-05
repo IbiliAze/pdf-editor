@@ -40,7 +40,7 @@ export default function Toolbar({
     <header className="toolbar">
       <a className="brand" href="https://eightmile.co.uk">
         <img src="/logo-inverted-removebg-preview.png" alt="Eight Mile logo" />
-        Eight Mile
+        <span className="brand-name">Eight Mile</span>
       </a>
 
       <button className="btn" onClick={onOpen}>
@@ -59,7 +59,7 @@ export default function Toolbar({
             onClick={() => onSelectTool(t.id)}
           >
             <span className="tool-icon">{t.icon}</span>
-            {t.label}
+            <span className="tool-label">{t.label}</span>
           </button>
         ))}
       </div>

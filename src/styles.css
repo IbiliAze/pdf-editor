@@ -1,0 +1,385 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #1f2937;
+  background: #e5e7ee;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #d8dae3;
+  flex-wrap: wrap;
+  z-index: 20;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 15px;
+  color: #4f46e5;
+  letter-spacing: -0.02em;
+  margin-right: 4px;
+}
+
+.brand span {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: #e2e4ec;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: #f1f2f7;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn.active {
+  background: #eef0ff;
+  border-color: #c7cbfa;
+  color: #4338ca;
+}
+
+.btn.primary {
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+  padding: 7px 16px;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.btn.toggle {
+  padding: 6px 9px;
+}
+
+.tool-icon {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.toolbar select,
+.toolbar input[type='number'] {
+  border: 1px solid #d8dae3;
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 12.5px;
+  background: #fff;
+  color: #374151;
+}
+
+.toolbar input[type='number'] {
+  width: 54px;
+}
+
+.toolbar input[type='color'] {
+  width: 30px;
+  height: 28px;
+  border: 1px solid #d8dae3;
+  border-radius: 7px;
+  padding: 2px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.zoom-label {
+  font-size: 12px;
+  color: #6b7280;
+  min-width: 42px;
+  text-align: center;
+}
+
+.doc-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-right: 6px;
+}
+
+.hintbar {
+  padding: 6px 16px;
+  font-size: 12.5px;
+  color: #5b6472;
+  background: #f6f7fb;
+  border-bottom: 1px solid #e2e4ec;
+}
+
+.notice {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid transparent;
+}
+
+.notice.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.notice.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.notice.info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+/* ---------- workspace ---------- */
+
+.workspace {
+  flex: 1;
+  overflow: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+.empty {
+  margin: auto;
+  max-width: 420px;
+  text-align: center;
+  background: #fff;
+  border: 1.5px dashed #c3c7d4;
+  border-radius: 16px;
+  padding: 48px 40px;
+  cursor: pointer;
+}
+
+.empty:hover {
+  border-color: #4f46e5;
+}
+
+.empty-mark {
+  display: inline-block;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.empty h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+
+.empty p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-label {
+  font-size: 11.5px;
+  color: #8891a0;
+}
+
+.page-wrap {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 8px 28px rgba(15, 23, 42, 0.1);
+  border-radius: 2px;
+}
+
+.page-wrap canvas {
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.overlay.tool-edittext { cursor: default; }
+.overlay.tool-text { cursor: text; }
+.overlay.tool-whiteout,
+.overlay.tool-highlight,
+.overlay.tool-pen { cursor: crosshair; }
+
+/* ---------- elements ---------- */
+
+.overlay > * {
+  position: absolute;
+}
+
+.line-hit {
+  cursor: text;
+  border-radius: 2px;
+}
+
+.line-hit:hover {
+  outline: 1.5px solid rgba(79, 70, 229, 0.65);
+  background: rgba(79, 70, 229, 0.07);
+}
+
+.line-editor {
+  border: 1.5px solid #4f46e5;
+  border-radius: 2px;
+  outline: none;
+  white-space: pre;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+  z-index: 10;
+}
+
+.edit-cover {
+  overflow: visible;
+  white-space: pre;
+}
+
+.edit-cover span {
+  white-space: pre;
+  display: block;
+}
+
+.tool-edittext .edit-cover {
+  cursor: text;
+}
+
+.tool-edittext .edit-cover:hover {
+  outline: 1.5px dashed rgba(79, 70, 229, 0.65);
+}
+
+.el-whiteout {
+  background: #ffffff;
+}
+
+.el-whiteout.live,
+.el-highlight.live {
+  outline: 1px dashed rgba(79, 70, 229, 0.7);
+}
+
+.el-highlight {
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+.draw-layer {
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.text-el {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  min-height: 1em;
+}
+
+.tool-select .text-el,
+.tool-select .el-whiteout,
+.tool-select .el-highlight,
+.tool-select .edit-cover {
+  cursor: move;
+}
+
+.tool-select .edit-cover {
+  cursor: pointer;
+}
+
+.text-el.editing {
+  border: 1.5px solid #4f46e5;
+  border-radius: 2px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.85);
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  z-index: 10;
+}
+
+.selected {
+  outline: 1.5px solid #4f46e5;
+  outline-offset: 1px;
+}
+
+.selected-vector {
+  filter: drop-shadow(0 0 2px rgba(79, 70, 229, 0.9));
+}
+
+.resize-handle {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  margin-top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4f46e5;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  cursor: ew-resize;
+}

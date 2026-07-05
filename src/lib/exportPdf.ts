@@ -1,9 +1,10 @@
 import { BlendMode, LineCapStyle, PDFDocument, PDFFont, degrees, rgb } from 'pdf-lib'
-import { standardFontFor } from './fonts'
+import fontkit from '@pdf-lib/fontkit'
+import { fontFileFor, standardFontFor } from './fonts'
 import { hexToRgb01 } from './colors'
 import { HIGHLIGHT_COLOR } from '../constants'
 import type { PDFDocumentProxy, PageViewport } from './pdfjs'
-import type { EditorElement, Line } from '../types'
+import type { EditorElement, FontSpec, Line } from '../types'
 
 const colorOf = (hex: string) => {
   const c = hexToRgb01(hex)
@@ -64,14 +65,25 @@ export async function buildEditedPdf({
   linesById,
 }: BuildEditedPdfArgs): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+  doc.registerFontkit(fontkit)
   const pdfPages = doc.getPages()
 
   const fontCache = new Map<string, PDFFont>()
-  const embed = async (spec: Line['font'] | undefined): Promise<PDFFont> => {
+  const embed = async (spec: FontSpec | undefined): Promise<PDFFont> => {
     const key = `${spec?.family}-${spec?.bold}-${spec?.italic}`
     let font = fontCache.get(key)
     if (!font) {
-      font = await doc.embedFont(standardFontFor(spec ?? {}))
+      const file = fontFileFor(spec ?? {})
+      if (file) {
+        // custom family: fetch the TTF and embed a subset of it
+        const fontBytes = await fetch(file).then((r) => {
+          if (!r.ok) throw new Error(`Could not load font ${file}`)
+          return r.arrayBuffer()
+        })
+        font = await doc.embedFont(fontBytes, { subset: true })
+      } else {
+        font = await doc.embedFont(standardFontFor(spec ?? {}))
+      }
       fontCache.set(key, font)
     }
     return font
@@ -107,9 +119,10 @@ export async function buildEditedPdf({
     if (el.type === 'edit') {
       const line = linesById[el.lineId]
       if (!line) continue
-      const font = await embed(line.font)
+      const font = await embed(el.font ?? line.font)
+      const size = el.size ?? line.fontHeight
       const text = sanitizeForFont(el.text, font)
-      const drawnW = text ? font.widthOfTextAtSize(text, line.fontHeight) : 0
+      const drawnW = text ? font.widthOfTextAtSize(text, size) : 0
       const coverW = Math.max(line.width, drawnW) + 2
       page.drawRectangle({
         ...rectToPdf(line.x - 1, line.top - 1, coverW, line.height + 2),
@@ -119,7 +132,7 @@ export async function buildEditedPdf({
         page.drawText(text, {
           x: line.pdfX,
           y: line.pdfBaseline,
-          size: line.fontHeight,
+          size,
           font,
           color: colorOf(el.color),
         })

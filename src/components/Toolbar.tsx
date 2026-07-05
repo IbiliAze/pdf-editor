@@ -1,5 +1,6 @@
-import { FAMILIES, TOOLS } from '../constants'
+import { TOOLS } from '../constants'
 import { clamp } from '../lib/colors'
+import { FAMILIES } from '../lib/fonts'
 import type { FontFamily, TextStyle, ToolId } from '../types'
 
 interface ToolbarProps {
@@ -87,6 +88,9 @@ export default function Toolbar({
         <button
           className={`btn toggle${style.bold ? ' active' : ''}`}
           disabled={!hasDoc}
+          // preventDefault keeps focus (and the open inline editor) intact
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onStyle({ bold: !style.bold })}
         >
           <b>B</b>
@@ -94,6 +98,8 @@ export default function Toolbar({
         <button
           className={`btn toggle${style.italic ? ' active' : ''}`}
           disabled={!hasDoc}
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onStyle({ italic: !style.italic })}
         >
           <i>I</i>

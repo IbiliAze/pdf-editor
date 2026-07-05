@@ -10,6 +10,7 @@ import { downloadBytes, nid, normRect } from './lib/utils'
 import { clamp } from './lib/colors'
 import { HIGHLIGHT_COLOR, TOOLS, ZOOM_LEVELS } from './constants'
 import type {
+  EditElement,
   EditingSession,
   EditorElement,
   Line,
@@ -110,38 +111,66 @@ export default function App() {
     setEditing(null)
     const line = linesById[s.lineId]
     if (!line) return
+    const fontDirty =
+      s.font.family !== line.font.family ||
+      s.font.bold !== line.font.bold ||
+      s.font.italic !== line.font.italic
+    const sizeDirty = Math.abs(s.size - line.fontHeight) > 0.01
+    const dirty = s.text !== line.text || fontDirty || sizeDirty || s.color !== s.baseColor
+    const existing = els.elementsRef.current.find(
+      (el): el is EditElement => el.type === 'edit' && el.lineId === s.lineId,
+    )
+    const id = existing?.id ?? nid()
     els.commit((prev) => {
       const others = prev.filter((el) => !(el.type === 'edit' && el.lineId === s.lineId))
-      if (s.text === line.text) return others.length === prev.length ? prev : others
-      return [
-        ...others,
-        { id: nid(), type: 'edit', lineId: s.lineId, pageIndex: s.pageIndex, text: s.text, bg: s.bg, color: s.color },
-      ]
+      if (!dirty) return others.length === prev.length ? prev : others
+      const edit: EditElement = {
+        id,
+        type: 'edit',
+        lineId: s.lineId,
+        pageIndex: s.pageIndex,
+        text: s.text,
+        bg: s.bg,
+        color: s.color,
+        baseColor: s.baseColor,
+      }
+      if (fontDirty) edit.font = s.font
+      if (sizeDirty) edit.size = s.size
+      return [...others, edit]
     })
+    // Keep the committed edit selected so toolbar style controls (which blur
+    // and thereby close the inline editor) still have a target to apply to.
+    setSelectedId(dirty ? id : null)
   }, [linesById, els, setEditing])
 
   const startLineEdit = useCallback(
     (line: Line, canvas: HTMLCanvasElement | null, page: PageInfo | null) => {
       if (editingRef.current) commitLineEdit()
       const existing = els.elementsRef.current.find(
-        (el) => el.type === 'edit' && el.lineId === line.id,
+        (el): el is EditElement => el.type === 'edit' && el.lineId === line.id,
       )
       let bg = '#ffffff'
       let color = '#111827'
-      if (existing && existing.type === 'edit') {
+      let baseColor = '#111827'
+      if (existing) {
         bg = existing.bg
         color = existing.color
+        baseColor = existing.baseColor ?? existing.color
       } else if (canvas && page) {
         const sampled = sampleLineColors(canvas, line, canvas.width / page.width)
         bg = sampled.bg
         color = sampled.color
+        baseColor = sampled.color
       }
       setEditing({
         lineId: line.id,
         pageIndex: line.pageIndex,
-        text: existing && existing.type === 'edit' ? existing.text : line.text,
+        text: existing ? existing.text : line.text,
         bg,
         color,
+        baseColor,
+        font: existing?.font ?? line.font,
+        size: existing?.size ?? line.fontHeight,
       })
       setSelectedId(null)
     },
@@ -407,20 +436,55 @@ export default function App() {
   )
 
   const selectedEl = els.elements.find((el) => el.id === selectedId)
-  const shownStyle: TextStyle =
-    selectedEl?.type === 'text'
-      ? {
-          family: selectedEl.font.family,
-          bold: selectedEl.font.bold,
-          italic: selectedEl.font.italic,
-          size: selectedEl.size,
-          color: selectedEl.color,
-        }
-      : textStyle
+  let shownStyle: TextStyle = textStyle
+  if (editing) {
+    shownStyle = {
+      family: editing.font.family,
+      bold: editing.font.bold,
+      italic: editing.font.italic,
+      size: Math.round(editing.size),
+      color: editing.color,
+    }
+  } else if (selectedEl?.type === 'text') {
+    shownStyle = {
+      family: selectedEl.font.family,
+      bold: selectedEl.font.bold,
+      italic: selectedEl.font.italic,
+      size: selectedEl.size,
+      color: selectedEl.color,
+    }
+  } else if (selectedEl?.type === 'edit') {
+    const line = linesById[selectedEl.lineId]
+    const font = selectedEl.font ?? line?.font
+    shownStyle = {
+      family: font?.family ?? textStyle.family,
+      bold: font?.bold ?? false,
+      italic: font?.italic ?? false,
+      size: Math.round(selectedEl.size ?? line?.fontHeight ?? textStyle.size),
+      color: selectedEl.color,
+    }
+  }
 
   const applyStyle = useCallback(
     (patch: Partial<TextStyle>) => {
       setTextStyle((s) => ({ ...s, ...patch }))
+      // An open line-edit session takes priority: restyle it live. (Bold and
+      // italic buttons keep the editor focused via preventDefault; the other
+      // controls blur it, which commits and falls into the selection branch.)
+      const session = editingRef.current
+      if (session) {
+        setEditing({
+          ...session,
+          font: {
+            family: patch.family ?? session.font.family,
+            bold: patch.bold ?? session.font.bold,
+            italic: patch.italic ?? session.font.italic,
+          },
+          size: patch.size ?? session.size,
+          color: patch.color ?? session.color,
+        })
+        return
+      }
       if (selectedId == null) return
       const sel = els.elementsRef.current.find((el) => el.id === selectedId)
       if (!sel) return
@@ -439,14 +503,28 @@ export default function App() {
               color: patch.color ?? el.color,
             }
           }
-          if ((el.type === 'path' || el.type === 'edit') && patch.color != null) {
+          if (el.type === 'edit') {
+            const line = linesById[el.lineId]
+            const base = el.font ?? line?.font ?? { family: 'Helvetica' as const, bold: false, italic: false }
+            return {
+              ...el,
+              font: {
+                family: patch.family ?? base.family,
+                bold: patch.bold ?? base.bold,
+                italic: patch.italic ?? base.italic,
+              },
+              ...(patch.size != null ? { size: patch.size } : {}),
+              ...(patch.color != null ? { color: patch.color } : {}),
+            }
+          }
+          if (el.type === 'path' && patch.color != null) {
             return { ...el, color: patch.color }
           }
           return el
         }),
       )
     },
-    [selectedId, els],
+    [selectedId, els, linesById, setEditing],
   )
 
   // Zoom can be an arbitrary fit-to-width value, so step to the nearest

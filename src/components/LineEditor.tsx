@@ -24,9 +24,11 @@ export default function LineEditor({ editing, line, zoom, on }: LineEditorProps)
     }
   }, [])
 
-  const css = cssFontFor(line.font)
-  const textW = measureText(editing.text, line.fontHeight * zoom, line.font)
+  const css = cssFontFor(editing.font)
+  const fontSize = editing.size * zoom
+  const textW = measureText(editing.text, fontSize, editing.font)
   const width = Math.max((line.width + 6) * zoom + 8, textW + 20)
+  const height = (Math.max(line.height, editing.size * 1.2) + 6) * zoom
 
   return (
     <input
@@ -52,9 +54,9 @@ export default function LineEditor({ editing, line, zoom, on }: LineEditorProps)
         left: (line.x - 3) * zoom,
         top: (line.top - 3) * zoom,
         width,
-        height: (line.height + 6) * zoom,
+        height,
         padding: `0 ${3 * zoom}px`,
-        fontSize: line.fontHeight * zoom,
+        fontSize,
         ...css,
         color: editing.color,
         background: editing.bg,

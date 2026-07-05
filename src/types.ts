@@ -1,6 +1,15 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
-export type FontFamily = 'Helvetica' | 'Times' | 'Courier'
+export type FontFamily =
+  | 'Helvetica'
+  | 'Times'
+  | 'Courier'
+  | 'Roboto'
+  | 'Open Sans'
+  | 'Lato'
+  | 'Montserrat'
+  | 'Merriweather'
+  | 'Playfair Display'
 
 /** Font match for a text run: one of the 14 standard PDF fonts. */
 export interface FontSpec {
@@ -54,8 +63,13 @@ export interface EditElement extends ElementBase {
   text: string
   /** sampled page background color the cover rectangle is painted with */
   bg: string
-  /** sampled original text color */
+  /** current text color (sampled original unless the user restyled it) */
   color: string
+  /** the sampled original color, kept to detect color overrides */
+  baseColor?: string
+  /** style overrides; the original line's font/size apply when absent */
+  font?: FontSpec
+  size?: number
 }
 
 /** A user-added text box. */
@@ -111,6 +125,10 @@ export interface EditingSession {
   text: string
   bg: string
   color: string
+  /** sampled original color; a differing `color` marks a style override */
+  baseColor: string
+  font: FontSpec
+  size: number
 }
 
 export type ToolId = 'edittext' | 'text' | 'select' | 'whiteout' | 'highlight' | 'pen'

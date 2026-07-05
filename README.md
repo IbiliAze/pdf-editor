@@ -21,7 +21,8 @@ installs `pdf-editor.conf` into the shared nginx proxy.
 
 ## Features
 
-- **Edit text** (the core feature): click any text on the page, type the replacement, press Enter. Works on any PDF regardless of how its fonts are encoded — the original run is covered with a rectangle in the sampled background color and the replacement is drawn at the exact original baseline with a matched standard font (family/bold/italic detected from the PDF font name). Clear the box to erase a line entirely.
+- **Edit text** (the core feature): click any text on the page, type the replacement, press Enter. Works on any PDF regardless of how its fonts are encoded — the original run is covered with a rectangle in the sampled background color and the replacement is drawn at the exact original baseline with a matched standard font (family/bold/italic detected from the PDF font name). Clear the box to erase a line entirely. Edited lines can be restyled (family, size, bold/italic, color) via the toolbar, live while editing or with the committed edit selected.
+- **Fonts**: 9 families — Helvetica/Times/Courier (built-in standard fonts) plus Roboto, Open Sans, Lato, Montserrat, Merriweather, and Playfair Display (TTFs in `public/fonts/`, subset-embedded into the PDF at export via `@pdf-lib/fontkit`).
 - **Add text**: click to place a new text box (font, size, bold/italic, color configurable; drag to move, handle to resize width).
 - **Whiteout**: drag to cover content.
 - **Highlight**: drag to highlight (multiply blend, matches export).

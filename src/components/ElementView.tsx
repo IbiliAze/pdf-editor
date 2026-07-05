@@ -79,7 +79,9 @@ export default function ElementView({
     if (editingLineId === el.lineId) return null
     const line = linesById[el.lineId]
     if (!line) return null
-    const textW = measureText(el.text, line.fontHeight * zoom, line.font)
+    const font = el.font ?? line.font
+    const size = el.size ?? line.fontHeight
+    const textW = measureText(el.text, size * zoom, font)
     const coverW = Math.max((line.width + 2) * zoom, textW + 2)
     return (
       <div
@@ -95,8 +97,8 @@ export default function ElementView({
       >
         <span
           style={{
-            fontSize: line.fontHeight * zoom,
-            ...cssFontFor(line.font),
+            fontSize: size * zoom,
+            ...cssFontFor(font),
             color: el.color,
             lineHeight: `${(line.height + 2) * zoom}px`,
           }}

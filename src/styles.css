@@ -1,3 +1,29 @@
+/* Embeddable font families (same TTFs are subset into exported PDFs). */
+@font-face { font-family: 'Roboto'; src: url('/fonts/roboto-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Roboto'; src: url('/fonts/roboto-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Roboto'; src: url('/fonts/roboto-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Roboto'; src: url('/fonts/roboto-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/fonts/opensans-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/fonts/opensans-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/fonts/opensans-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/fonts/opensans-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('/fonts/lato-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('/fonts/lato-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('/fonts/lato-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lato'; src: url('/fonts/lato-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/montserrat-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('/fonts/merriweather-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('/fonts/merriweather-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('/fonts/merriweather-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('/fonts/merriweather-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('/fonts/playfair-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('/fonts/playfair-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('/fonts/playfair-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('/fonts/playfair-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+
 * {
   box-sizing: border-box;
 }

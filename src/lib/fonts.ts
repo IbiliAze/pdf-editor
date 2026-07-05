@@ -1,12 +1,13 @@
 import { StandardFonts } from 'pdf-lib'
+import type { FontFamily, FontSpec } from '../types'
 
 // Map a PDF font name (e.g. "ABCDEF+TimesNewRomanPS-BoldItalicMT") plus the
 // pdf.js css family hint ("serif" | "sans-serif" | "monospace") onto one of
 // the 14 standard fonts, so replacement text visually matches the original.
-export function detectFont(rawName = '', familyHint = '') {
+export function detectFont(rawName = '', familyHint = ''): FontSpec {
   const name = String(rawName).toLowerCase()
   const hint = String(familyHint).toLowerCase()
-  let family = 'Helvetica'
+  let family: FontFamily = 'Helvetica'
   if (/courier|mono|consolas|menlo/.test(name) || /mono/.test(hint)) {
     family = 'Courier'
   } else if (
@@ -20,7 +21,7 @@ export function detectFont(rawName = '', familyHint = '') {
   return { family, bold, italic }
 }
 
-const TABLE = {
+const TABLE: Record<FontFamily, [StandardFonts, StandardFonts, StandardFonts, StandardFonts]> = {
   Helvetica: [
     StandardFonts.Helvetica,
     StandardFonts.HelveticaBold,
@@ -41,30 +42,38 @@ const TABLE = {
   ],
 }
 
-export function standardFontFor({ family, bold, italic } = {}) {
-  const row = TABLE[family] || TABLE.Helvetica
-  return row[(bold ? 1 : 0) + (italic ? 2 : 0)]
+export function standardFontFor(spec: Partial<FontSpec> = {}): StandardFonts {
+  const row = TABLE[spec.family ?? 'Helvetica'] ?? TABLE.Helvetica
+  return row[(spec.bold ? 1 : 0) + (spec.italic ? 2 : 0)]
 }
 
-const CSS_STACKS = {
+const CSS_STACKS: Record<FontFamily, string> = {
   Helvetica: 'Helvetica, Arial, sans-serif',
   Times: '"Times New Roman", Times, serif',
   Courier: '"Courier New", Courier, monospace',
 }
 
-export function cssFontFor({ family, bold, italic } = {}) {
+export interface CssFont {
+  fontFamily: string
+  fontWeight: number
+  fontStyle: 'italic' | 'normal'
+}
+
+export function cssFontFor(spec: Partial<FontSpec> = {}): CssFont {
   return {
-    fontFamily: CSS_STACKS[family] || CSS_STACKS.Helvetica,
-    fontWeight: bold ? 700 : 400,
-    fontStyle: italic ? 'italic' : 'normal',
+    fontFamily: CSS_STACKS[spec.family ?? 'Helvetica'] ?? CSS_STACKS.Helvetica,
+    fontWeight: spec.bold ? 700 : 400,
+    fontStyle: spec.italic ? 'italic' : 'normal',
   }
 }
 
-let measureCanvas = null
+let measureCanvas: HTMLCanvasElement | null = null
 
-export function measureText(text, fontSizePx, fontSpec) {
+/** Width in px of `text` rendered with the css approximation of `fontSpec`. */
+export function measureText(text: string, fontSizePx: number, fontSpec: FontSpec): number {
   if (!measureCanvas) measureCanvas = document.createElement('canvas')
   const ctx = measureCanvas.getContext('2d')
+  if (!ctx) return 0
   const css = cssFontFor(fontSpec)
   ctx.font = `${css.fontStyle} ${css.fontWeight} ${fontSizePx}px ${css.fontFamily}`
   return ctx.measureText(text).width

@@ -1,15 +1,18 @@
-import { BlendMode, LineCapStyle, PDFDocument, degrees, rgb } from 'pdf-lib'
+import { BlendMode, LineCapStyle, PDFDocument, PDFFont, degrees, rgb } from 'pdf-lib'
 import { standardFontFor } from './fonts'
 import { hexToRgb01 } from './colors'
+import { HIGHLIGHT_COLOR } from '../constants'
+import type { PDFDocumentProxy, PageViewport } from './pdfjs'
+import type { EditorElement, Line } from '../types'
 
-const colorOf = (hex) => {
+const colorOf = (hex: string) => {
   const c = hexToRgb01(hex)
   return rgb(c.r, c.g, c.b)
 }
 
 // The 14 standard fonts only cover WinAnsi. Map lookalikes onto encodable
 // characters and drop anything the font still cannot encode.
-const REPLACEMENTS = {
+const REPLACEMENTS: Record<string, string> = {
   '­': '-', // soft hyphen
   '‐': '-', // hyphen
   '‑': '-', // non-breaking hyphen
@@ -20,11 +23,11 @@ const REPLACEMENTS = {
   'ﬁ': 'fi',
   'ﬂ': 'fl',
   ' ': ' ', // non-breaking space
-  ' ': '\n',
-  ' ': '\n',
+  ' ': '\n', // line separator
+  ' ': '\n', // paragraph separator
 }
 
-export function sanitizeForFont(text, font) {
+export function sanitizeForFont(text: string, font: PDFFont): string {
   let out = ''
   for (const ch of String(text)) {
     const mapped = REPLACEMENTS[ch] ?? ch
@@ -42,32 +45,54 @@ export function sanitizeForFont(text, font) {
   return out
 }
 
-// Build the edited PDF: every element is drawn onto the original document.
-// Native text edits cover the original run with its sampled background
-// color and draw the replacement at the run's exact PDF baseline.
-export async function buildEditedPdf({ bytes, pdfjsDoc, elements, linesById }) {
+export interface BuildEditedPdfArgs {
+  bytes: ArrayBuffer
+  pdfjsDoc: PDFDocumentProxy
+  elements: EditorElement[]
+  linesById: Record<string, Line>
+}
+
+/**
+ * Build the edited PDF: every element is drawn onto the original document.
+ * Native text edits cover the original run with its sampled background
+ * color and draw the replacement at the run's exact PDF baseline.
+ */
+export async function buildEditedPdf({
+  bytes,
+  pdfjsDoc,
+  elements,
+  linesById,
+}: BuildEditedPdfArgs): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
   const pdfPages = doc.getPages()
 
-  const fontCache = new Map()
-  const embed = async (spec) => {
+  const fontCache = new Map<string, PDFFont>()
+  const embed = async (spec: Line['font'] | undefined): Promise<PDFFont> => {
     const key = `${spec?.family}-${spec?.bold}-${spec?.italic}`
-    if (!fontCache.has(key)) fontCache.set(key, await doc.embedFont(standardFontFor(spec || {})))
-    return fontCache.get(key)
+    let font = fontCache.get(key)
+    if (!font) {
+      font = await doc.embedFont(standardFontFor(spec ?? {}))
+      fontCache.set(key, font)
+    }
+    return font
   }
 
-  const vpCache = new Map()
-  const viewportOf = async (i) => {
-    if (!vpCache.has(i)) vpCache.set(i, (await pdfjsDoc.getPage(i + 1)).getViewport({ scale: 1 }))
-    return vpCache.get(i)
+  const vpCache = new Map<number, PageViewport>()
+  const viewportOf = async (i: number): Promise<PageViewport> => {
+    let vp = vpCache.get(i)
+    if (!vp) {
+      vp = (await pdfjsDoc.getPage(i + 1)).getViewport({ scale: 1 })
+      vpCache.set(i, vp)
+    }
+    return vp
   }
 
   for (const el of elements) {
     const page = pdfPages[el.pageIndex]
     if (!page) continue
     const vp = await viewportOf(el.pageIndex)
-    const toPdf = (x, y) => vp.convertToPdfPoint(x, y)
-    const rectToPdf = (x, y, w, h) => {
+    const toPdf = (x: number, y: number) => vp.convertToPdfPoint(x, y)
+    const rectToPdf = (x: number, y: number, w: number, h: number) => {
       const [ax, ay] = toPdf(x, y)
       const [bx, by] = toPdf(x + w, y + h)
       return {
@@ -121,7 +146,7 @@ export async function buildEditedPdf({ bytes, pdfjsDoc, elements, linesById }) {
     } else if (el.type === 'highlight') {
       page.drawRectangle({
         ...rectToPdf(el.x, el.y, el.w, el.h),
-        color: colorOf(el.color || '#fde047'),
+        color: colorOf(el.color || HIGHLIGHT_COLOR),
         opacity: 0.45,
         blendMode: BlendMode.Multiply,
       })

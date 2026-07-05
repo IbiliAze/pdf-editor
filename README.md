@@ -1,4 +1,4 @@
-# PDF Editor
+# Eight Mile
 
 Browser-based PDF editor. Everything runs locally — no file ever leaves the browser.
 
@@ -18,6 +18,48 @@ npm run dev
 - **Pen**: freehand drawing.
 - **Select**: move/restyle/delete anything you added (Del key), including reverting a text edit to the original.
 - Undo/redo (Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z), zoom 50–300%, drag & drop to open.
+
+## Project structure
+
+TypeScript throughout. Types are the map: start at `src/types.ts`.
+
+```
+src/
+  main.tsx               entry point
+  App.tsx                state orchestration: tools, zoom, selection, edit
+                         sessions, drag/draw handlers, keyboard, export wiring
+  types.ts               ALL shared types: elements union (EditElement,
+                         TextElement, Whiteout/Highlight/Path), Line, PageInfo,
+                         EditingSession, ToolId, PageHandlers
+  constants.ts           TOOLS list (labels/hints), font families, zoom levels
+  styles.css             all styling
+  hooks/
+    useElements.ts       elements list + undo/redo history (state + refs)
+    usePdfDocument.ts    open/load PDF, page + text-line extraction, byte refs
+  lib/
+    pdfjs.ts             pdf.js worker setup + type re-exports
+    textLayer.ts         text extraction: grouping items into editable line
+                         runs; canvas color sampling (bg + text color)
+    exportPdf.ts         writes the edited PDF (cover rects + replacement
+                         text at original baselines); WinAnsi sanitizing
+    fonts.ts             PDF font name → standard-14 font match; css
+                         approximation; text measuring
+    colors.ts            hex/rgb conversion, clamps
+    utils.ts             element ids, download, rect normalization
+  components/
+    Toolbar.tsx          top bar: tools, text style controls, undo/zoom/export
+    PageView.tsx         one page: canvas render + overlay, line hit targets
+    ElementView.tsx      renders one committed element (all five types)
+    LineEditor.tsx       inline input over a native text line
+```
+
+Where to make common changes:
+
+- Text extraction wrong (lines split/merged badly) → `lib/textLayer.ts` (`groupIntoLines`)
+- Replacement text looks wrong in the exported file → `lib/exportPdf.ts` (edit branch) or `lib/fonts.ts` (font matching)
+- Wrong colors on covers → `lib/textLayer.ts` (`sampleLineColors`)
+- Editing interaction (click/commit/cancel) → `App.tsx` (`startLineEdit`/`commitLineEdit`) and `components/LineEditor.tsx`
+- New tool or element type → add to `types.ts` + `constants.ts`, render in `ElementView.tsx`, handle in `App.tsx`, export in `lib/exportPdf.ts`
 
 ## How text editing works
 

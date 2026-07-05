@@ -1,0 +1,146 @@
+import type { MouseEvent as ReactMouseEvent } from 'react'
+
+export type FontFamily = 'Helvetica' | 'Times' | 'Courier'
+
+/** Font match for a text run: one of the 14 standard PDF fonts. */
+export interface FontSpec {
+  family: FontFamily
+  bold: boolean
+  italic: boolean
+}
+
+export interface Point {
+  x: number
+  y: number
+}
+
+/**
+ * An editable native text run extracted from the PDF. All geometry is in
+ * scale-1 viewport units (CSS px at 100% zoom == PDF points). pdfX and
+ * pdfBaseline are the run's raw PDF text-space origin, used at export so
+ * replacement text lands exactly on the original baseline.
+ */
+export interface Line {
+  id: string
+  pageIndex: number
+  text: string
+  x: number
+  width: number
+  top: number
+  height: number
+  baseline: number
+  fontHeight: number
+  font: FontSpec
+  pdfX: number
+  pdfBaseline: number
+}
+
+export interface PageInfo {
+  pageIndex: number
+  width: number
+  height: number
+  lines: Line[]
+}
+
+interface ElementBase {
+  id: number
+  pageIndex: number
+}
+
+/** A committed replacement of a native text line (cover + redraw on export). */
+export interface EditElement extends ElementBase {
+  type: 'edit'
+  lineId: string
+  text: string
+  /** sampled page background color the cover rectangle is painted with */
+  bg: string
+  /** sampled original text color */
+  color: string
+}
+
+/** A user-added text box. */
+export interface TextElement extends ElementBase {
+  type: 'text'
+  x: number
+  y: number
+  w: number
+  text: string
+  size: number
+  color: string
+  font: FontSpec
+}
+
+export interface WhiteoutElement extends ElementBase {
+  type: 'whiteout'
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface HighlightElement extends ElementBase {
+  type: 'highlight'
+  x: number
+  y: number
+  w: number
+  h: number
+  color: string
+}
+
+export interface PathElement extends ElementBase {
+  type: 'path'
+  points: Point[]
+  color: string
+  width: number
+}
+
+export type EditorElement =
+  | EditElement
+  | TextElement
+  | WhiteoutElement
+  | HighlightElement
+  | PathElement
+
+/** Shape being dragged out right now (not yet committed to elements). */
+export type LiveDraw = WhiteoutElement | HighlightElement | PathElement
+
+/** An open inline editor over a native text line. */
+export interface EditingSession {
+  lineId: string
+  pageIndex: number
+  text: string
+  bg: string
+  color: string
+}
+
+export type ToolId = 'edittext' | 'text' | 'select' | 'whiteout' | 'highlight' | 'pen'
+
+export interface TextStyle {
+  family: FontFamily
+  bold: boolean
+  italic: boolean
+  size: number
+  color: string
+}
+
+export interface Status {
+  type: 'error' | 'success' | 'info'
+  msg: string
+}
+
+/** Callbacks PageView and its children invoke; implemented in App.tsx. */
+export interface PageHandlers {
+  pageMouseDown: (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => void
+  pageMouseMove: (e: ReactMouseEvent<HTMLDivElement>, page: PageInfo) => void
+  pageMouseUp: () => void
+  pageMouseLeave: () => void
+  lineClick: (line: Line, canvas: HTMLCanvasElement | null, page: PageInfo | null) => void
+  lineEditChange: (text: string) => void
+  commitLineEdit: () => void
+  cancelLineEdit: () => void
+  elementMouseDown: (e: ReactMouseEvent, el: EditorElement) => void
+  resizeMouseDown: (e: ReactMouseEvent, el: TextElement) => void
+  elementDoubleClick: (el: EditorElement) => void
+  elementTextChange: (id: number, text: string) => void
+  finishElementEdit: (id: number) => void
+}

@@ -1,19 +1,43 @@
-import * as pdfjsLib from 'pdfjs-dist'
+import { pdfjsLib } from './pdfjs'
+import type { PDFPageProxy } from './pdfjs'
 import { detectFont } from './fonts'
 import { clampInt, rgbToHex } from './colors'
+import type { FontSpec, Line } from '../types'
 
-// Extract the text of a page as editable line runs. All geometry is in
-// scale-1 viewport units (CSS px at 100% zoom == PDF points), except
-// pdfX/pdfBaseline which are the raw PDF text-space origin of the run and
-// are used at export time so replacement text lands exactly on the
-// original baseline.
-export async function extractPageLines(page, pageIndex) {
+interface RawItem {
+  str: string
+  x: number
+  baseline: number
+  width: number
+  fontHeight: number
+  ascent: number
+  descent: number
+  font: FontSpec
+  pdfX: number
+  pdfBaseline: number
+}
+
+interface PdfTextStyle {
+  ascent?: number
+  descent?: number
+  fontFamily?: string
+}
+
+/**
+ * Extract the text of a page as editable line runs. All geometry is in
+ * scale-1 viewport units (CSS px at 100% zoom == PDF points), except
+ * pdfX/pdfBaseline which are the raw PDF text-space origin of the run and
+ * are used at export time so replacement text lands exactly on the
+ * original baseline.
+ */
+export async function extractPageLines(page: PDFPageProxy, pageIndex: number): Promise<Line[]> {
   const viewport = page.getViewport({ scale: 1 })
   const textContent = await page.getTextContent()
-  const items = []
+  const items: RawItem[] = []
 
   for (const item of textContent.items) {
-    if (!item.str || !item.str.trim() || !item.width) continue
+    if (!('str' in item)) continue
+    if (!item.str.trim() || !item.width) continue
     const tx = pdfjsLib.Util.transform(viewport.transform, item.transform)
     const fontHeight = Math.hypot(tx[2], tx[3])
     if (!fontHeight) continue
@@ -21,10 +45,11 @@ export async function extractPageLines(page, pageIndex) {
     // re-drawing it from a horizontal bounding box would be wrong.
     if (Math.abs(tx[1]) > fontHeight * 0.05) continue
 
-    const style = textContent.styles?.[item.fontName] || {}
+    const style: PdfTextStyle = textContent.styles?.[item.fontName] ?? {}
     let realName = ''
     try {
-      realName = page.commonObjs.get(item.fontName)?.name || ''
+      const fontData = page.commonObjs.get(item.fontName) as { name?: string } | null
+      realName = fontData?.name ?? ''
     } catch {
       // font data not resolved yet; the css family hint still applies
     }
@@ -35,8 +60,8 @@ export async function extractPageLines(page, pageIndex) {
       baseline: tx[5],
       width: item.width,
       fontHeight,
-      ascent: style.ascent > 0 ? style.ascent : 0.8,
-      descent: Math.min(Math.abs(style.descent || 0.2), 0.5) || 0.2,
+      ascent: style.ascent && style.ascent > 0 ? style.ascent : 0.8,
+      descent: Math.min(Math.abs(style.descent ?? 0.2), 0.5) || 0.2,
       font: detectFont(realName, style.fontFamily),
       pdfX: item.transform[4],
       pdfBaseline: item.transform[5],
@@ -46,8 +71,8 @@ export async function extractPageLines(page, pageIndex) {
   return groupIntoLines(items, pageIndex)
 }
 
-function groupIntoLines(items, pageIndex) {
-  const rows = []
+function groupIntoLines(items: RawItem[], pageIndex: number): Line[] {
+  const rows: { baseline: number; items: RawItem[] }[] = []
   const sorted = items.slice().sort((a, b) => a.baseline - b.baseline || a.x - b.x)
   for (const it of sorted) {
     const tol = Math.max(2, it.fontHeight * 0.4)
@@ -56,11 +81,11 @@ function groupIntoLines(items, pageIndex) {
     else rows.push({ baseline: it.baseline, items: [it] })
   }
 
-  const lines = []
+  const lines: Line[] = []
   let n = 0
   for (const row of rows) {
     row.items.sort((a, b) => a.x - b.x)
-    let run = null
+    let run: RawItem[] | null = null
     const flush = () => {
       if (run) lines.push(finishRun(run, pageIndex, n++))
       run = null
@@ -88,7 +113,7 @@ function groupIntoLines(items, pageIndex) {
   return lines
 }
 
-function finishRun(items, pageIndex, n) {
+function finishRun(items: RawItem[], pageIndex: number, n: number): Line {
   let text = ''
   for (let i = 0; i < items.length; i++) {
     const it = items[i]
@@ -124,11 +149,22 @@ function finishRun(items, pageIndex, n) {
   }
 }
 
-// Sample the rendered canvas around a line to recover its background and
-// text colors, so the cover rectangle and replacement text blend in even on
-// non-white pages. `scale` is device pixels per scale-1 viewport unit.
-export function sampleLineColors(canvas, line, scale) {
-  const fallback = { bg: '#ffffff', color: '#111827' }
+export interface SampledColors {
+  bg: string
+  color: string
+}
+
+/**
+ * Sample the rendered canvas around a line to recover its background and
+ * text colors, so the cover rectangle and replacement text blend in even on
+ * non-white pages. `scale` is device pixels per scale-1 viewport unit.
+ */
+export function sampleLineColors(
+  canvas: HTMLCanvasElement,
+  line: Line,
+  scale: number,
+): SampledColors {
+  const fallback: SampledColors = { bg: '#ffffff', color: '#111827' }
   try {
     if (!canvas || !canvas.width || !scale) return fallback
     const pad = Math.max(2, Math.round(2 * scale))
@@ -139,14 +175,16 @@ export function sampleLineColors(canvas, line, scale) {
     const w = x1 - x0
     const h = y1 - y0
     if (w < 3 || h < 3) return fallback
-    const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(x0, y0, w, h).data
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return fallback
+    const data = ctx.getImageData(x0, y0, w, h).data
 
     // Background: the dominant color along the border of the padded box.
-    const buckets = new Map()
-    const addBorder = (px, py) => {
+    const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()
+    const addBorder = (px: number, py: number) => {
       const i = (py * w + px) * 4
       const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4)
-      const e = buckets.get(key) || { n: 0, r: 0, g: 0, b: 0 }
+      const e = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 }
       e.n++
       e.r += data[i]
       e.g += data[i + 1]
@@ -174,7 +212,7 @@ export function sampleLineColors(canvas, line, scale) {
     // Text color: average of the pixels farthest from the background.
     const step = Math.max(1, Math.round(Math.sqrt((w * h) / 40000)))
     let maxD = 0
-    const samples = []
+    const samples: [number, number][] = []
     for (let yy = 0; yy < h; yy += step) {
       for (let xx = 0; xx < w; xx += step) {
         const i = (yy * w + xx) * 4

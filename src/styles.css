@@ -65,7 +65,7 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
   font-weight: 700;
   font-size: 15px;
   color: #1f2937;
@@ -75,10 +75,26 @@ body {
   text-decoration: none;
 }
 
-.brand img {
-  width: 26px;
-  height: 26px;
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #fff4df;
+  box-shadow: inset 0 0 0 1px rgba(255, 168, 0, 0.22);
+}
+
+.brand-mark img {
+  width: 27px;
+  height: 27px;
   display: block;
+  object-fit: contain;
+}
+
+.brand-name > span {
+  color: #b57400;
 }
 
 .group {
@@ -248,10 +264,28 @@ body {
   border-color: #ffa800;
 }
 
+.empty-logo-wrap {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 18px;
+  border-radius: 26px;
+  background: linear-gradient(145deg, #fff8e9, #fff0d0);
+  box-shadow: 0 12px 28px rgba(167, 103, 0, 0.14), inset 0 0 0 1px rgba(255, 168, 0, 0.2);
+  transform: rotate(-3deg);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.empty:hover .empty-logo-wrap {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 0 16px 34px rgba(167, 103, 0, 0.18), inset 0 0 0 1px rgba(255, 168, 0, 0.28);
+}
+
 .empty-logo {
-  width: 72px;
-  height: 72px;
-  margin-bottom: 14px;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
 }
 
 .empty h2 {

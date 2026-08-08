@@ -637,7 +637,9 @@ export default function App() {
       <main className="workspace" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
         {!hasDoc && !pdf.loading && (
           <div className="empty" onClick={() => fileInputRef.current?.click()}>
-            <img className="empty-logo" src="/logo-inverted-removebg-preview.png" alt="Eight Mile logo" />
+            <span className="empty-logo-wrap">
+              <img className="empty-logo" src="/eight-mile-pdf-logo.png" alt="Eight Mile PDF logo" />
+            </span>
             <h2>Open a PDF to start editing</h2>
             <p>
               Click here or drop a file. Click any text on the page to rewrite it — everything

@@ -1,4 +1,8 @@
-# Eight Mile
+<p align="center">
+  <img src="public/eight-mile-pdf-logo.png" alt="Eight Mile PDF logo" width="112" />
+</p>
+
+# Eight Mile PDF
 
 Browser-based PDF editor. Everything runs locally — no file ever leaves the browser.
 

@@ -40,8 +40,12 @@ export default function Toolbar({
   return (
     <header className="toolbar">
       <a className="brand" href="https://eightmile.co.uk">
-        <img src="/logo-inverted-removebg-preview.png" alt="Eight Mile logo" />
-        <span className="brand-name">Eight Mile</span>
+        <span className="brand-mark">
+          <img src="/eight-mile-pdf-logo.png" alt="" />
+        </span>
+        <span className="brand-name">
+          Eight Mile <span>PDF</span>
+        </span>
       </a>
 
       <button className="btn" onClick={onOpen}>

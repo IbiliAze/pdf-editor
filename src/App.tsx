@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import './features'
 import Toolbar from './components/Toolbar'
 import Workspace from './components/Workspace'
+import PasswordPrompt from './components/PasswordPrompt'
+import HelpDialog from './components/HelpDialog'
 import { useStore } from './store'
+import { PasswordRequiredError } from './store/documentSlice'
 import { useDragInteraction } from './hooks/useDragInteraction'
 import { useKeyboard } from './hooks/useKeyboard'
 import { toolById } from './features/registry'
@@ -29,12 +32,15 @@ export default function App() {
 
   useDragInteraction()
 
+  const [locked, setLocked] = useState<{ file: File; wrong: boolean } | null>(null)
+
   const handleOpen = useCallback(
-    async (file: File | null | undefined) => {
+    async (file: File | null | undefined, password?: string) => {
       if (!file) return
       setStatus(null)
       try {
-        await openFile(file)
+        await openFile(file, password)
+        setLocked(null)
         // Fit the page to the viewport on small screens; cap at the
         // comfortable desktop default.
         const first = useStore.getState().pages[0]
@@ -43,6 +49,10 @@ export default function App() {
           useStore.setState({ zoom: clamp(Math.min(1.25, avail / first.width), 0.4, 1.25) })
         }
       } catch (err) {
+        if (err instanceof PasswordRequiredError) {
+          setLocked({ file, wrong: err.wrongPassword })
+          return
+        }
         setStatus({ type: 'error', msg: `Could not open PDF: ${(err as Error)?.message ?? err}` })
       }
     },
@@ -50,6 +60,7 @@ export default function App() {
   )
 
   const [exporting, setExporting] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const handleExport = useCallback(() => {
     if (!useStore.getState().pages.length) return
@@ -84,6 +95,7 @@ export default function App() {
       <Toolbar
         onOpen={() => fileInputRef.current?.click()}
         onExport={handleExport}
+        onHelp={() => setHelpOpen(true)}
         right={
           <>
             {docLabel && <span className="doc-label">{docLabel}</span>}
@@ -112,6 +124,17 @@ export default function App() {
         <SearchPanel />
         <DecorationsPanel />
       </div>
+
+      {locked && (
+        <PasswordPrompt
+          fileName={locked.file.name}
+          wrongPassword={locked.wrong}
+          onCancel={() => setLocked(null)}
+          onSubmit={(password) => handleOpen(locked.file, password)}
+        />
+      )}
+
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       <AuthModal />
       <SignatureHost />

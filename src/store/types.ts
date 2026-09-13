@@ -62,8 +62,8 @@ export interface DocumentSlice {
   fileName: string
   loading: boolean
 
-  openFile: (file: File) => Promise<void>
-  addSource: (file: File, afterPageId?: string | null) => Promise<number>
+  openFile: (file: File, password?: string) => Promise<void>
+  addSource: (file: File, afterPageId?: string | null, password?: string) => Promise<number>
   ensurePageText: (pageId: string) => Promise<void>
   ensureAllPageText: (onProgress?: (done: number, total: number) => void) => Promise<void>
   invalidatePageText: (pageIds: string[]) => void

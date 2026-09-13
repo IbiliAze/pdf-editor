@@ -126,7 +126,7 @@ registerFeature({
     {
       id: 'note',
       label: 'Note',
-      icon: '🗨',
+      icon: '☷',
       group: 'annotate',
       order: 33,
       behaviour: noteTool,
@@ -135,7 +135,7 @@ registerFeature({
     {
       id: 'link',
       label: 'Link',
-      icon: '🔗',
+      icon: '⚭',
       group: 'annotate',
       order: 34,
       behaviour: linkTool,

@@ -50,7 +50,7 @@ registerFeature({
     {
       id: 'signature',
       label: 'Sign',
-      icon: '✍',
+      icon: '✍︎',
       group: 'insert',
       order: 22,
       behaviour: signatureTool,

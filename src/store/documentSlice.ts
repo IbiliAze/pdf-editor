@@ -29,15 +29,58 @@ export const clearRawCache = (docId?: string): void => {
   }
 }
 
-export async function loadSource(file: File): Promise<{ source: SourceDoc; pages: Page[] }> {
-  const bytes = await file.arrayBuffer()
+/** Thrown when a file needs a password we have not been given. */
+export class PasswordRequiredError extends Error {
+  wrongPassword: boolean
+  constructor(wrongPassword: boolean) {
+    super(wrongPassword ? 'That password did not work.' : 'This PDF is password protected.')
+    this.name = 'PasswordRequiredError'
+    this.wrongPassword = wrongPassword
+  }
+}
+
+const isPasswordException = (err: unknown): { code?: number } | null => {
+  const e = err as { name?: string; code?: number }
+  return e?.name === 'PasswordException' ? e : null
+}
+
+export async function loadSource(
+  file: File,
+  password?: string,
+): Promise<{ source: SourceDoc; pages: Page[] }> {
+  let bytes = await file.arrayBuffer()
+  let encrypted = false
+
+  if (password) {
+    // pdf-lib cannot read an encrypted file, so the bytes kept for export have
+    // to be decrypted up front; pdf.js is then given the plain copy too.
+    try {
+      const { PDFDocument } = await import('@cantoo/pdf-lib')
+      const doc = await PDFDocument.load(bytes, { password })
+      const saved = await doc.save()
+      bytes = saved.buffer.slice(
+        saved.byteOffset,
+        saved.byteOffset + saved.byteLength,
+      ) as ArrayBuffer
+      encrypted = true
+    } catch {
+      throw new PasswordRequiredError(true)
+    }
+  }
+
   // pdf.js transfers its buffer to the worker, so hand it a copy and keep the
   // pristine original for pdf-lib at export time.
-  const task = pdfjsLib.getDocument({
-    data: new Uint8Array(bytes.slice(0)),
-    fontExtraProperties: true,
-  })
-  const doc = await task.promise
+  let doc
+  try {
+    doc = await pdfjsLib.getDocument({
+      data: new Uint8Array(bytes.slice(0)),
+      fontExtraProperties: true,
+    }).promise
+  } catch (err) {
+    const pw = isPasswordException(err)
+    if (pw) throw new PasswordRequiredError(pw.code === 2)
+    throw err
+  }
 
   const sizes = []
   for (let i = 0; i < doc.numPages; i++) {
@@ -52,7 +95,7 @@ export async function loadSource(file: File): Promise<{ source: SourceDoc; pages
     bytes,
     pdfjs: doc,
     pageCount: doc.numPages,
-    encrypted: false,
+    encrypted,
   }
   return { source, pages: createPages(source.id, sizes) }
 }
@@ -69,10 +112,10 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
   fileName: '',
   loading: false,
 
-  openFile: async (file) => {
+  openFile: async (file, password) => {
     set({ loading: true })
     try {
-      const { source, pages } = await loadSource(file)
+      const { source, pages } = await loadSource(file, password)
       // Only tear the old document down once the new one has fully parsed, so
       // a failed open leaves the previous document intact.
       for (const old of Object.values(get().sources)) {
@@ -107,8 +150,8 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
     }
   },
 
-  addSource: async (file, afterPageId) => {
-    const { source, pages: newPages } = await loadSource(file)
+  addSource: async (file, afterPageId, password) => {
+    const { source, pages: newPages } = await loadSource(file, password)
     const state = get()
     const at = afterPageId
       ? state.pages.findIndex((p) => p.id === afterPageId) + 1

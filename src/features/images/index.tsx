@@ -124,7 +124,7 @@ registerFeature({
     {
       id: 'image',
       label: 'Image',
-      icon: '🖼',
+      icon: '▣',
       group: 'insert',
       order: 21,
       behaviour: imageTool,

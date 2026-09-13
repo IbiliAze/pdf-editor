@@ -74,13 +74,34 @@ body {
 
 .toolbar {
   display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-bottom: 1px solid #d8dae3;
+  z-index: 20;
+}
+
+/* Two explicit rows: what you do on top, how it looks underneath. Wrapping a
+   single row shuffled controls between lines as the window resized. */
+.toolbar-row {
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: #ffffff;
-  border-bottom: 1px solid #d8dae3;
   flex-wrap: wrap;
-  z-index: 20;
+}
+
+.toolbar-row.secondary {
+  padding-top: 0;
+  padding-bottom: 7px;
+  border-top: 1px solid #f0f1f5;
+  padding-top: 7px;
+}
+
+/* Sixteen tools do not fit one line on most screens; wrapping the strip keeps
+   every label readable instead of reducing them all to glyphs. */
+.toolbar-row .btn.tool {
+  padding: 6px 8px;
+  font-size: 11.5px;
 }
 
 .brand {
@@ -595,9 +616,13 @@ body {
 }
 
 @media (max-width: 600px) {
-  .toolbar {
+  .toolbar-row {
     gap: 4px;
     padding: 6px 8px;
+  }
+
+  .toolbar-row.secondary {
+    padding-top: 0;
   }
 
   .brand-name {
@@ -1555,4 +1580,41 @@ select.form-input {
 .callout p {
   margin: 4px 0 8px;
   color: #7c2d12;
+}
+
+
+/* ---------- help ---------- */
+
+.help-heading {
+  margin: 14px 0 6px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8891a0;
+}
+
+.help-heading:first-child {
+  margin-top: 0;
+}
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.help-table th {
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 4px 12px 4px 0;
+  vertical-align: top;
+  width: 1%;
+  color: #374151;
+}
+
+.help-table td {
+  padding: 4px 0;
+  color: #4b5563;
+  line-height: 1.45;
 }

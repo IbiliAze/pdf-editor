@@ -1,5 +1,6 @@
 import Modal from './Modal'
 import { allTools } from '../features/registry'
+import { eightmileUrl, outbound } from '../lib/eightmile'
 
 const SHORTCUTS: [string, string][] = [
   ['Cmd/Ctrl + Z', 'Undo'],
@@ -49,8 +50,18 @@ export default function HelpDialog({ onClose }: { onClose: () => void }) {
       </table>
 
       <p className="hint">
-        Your PDF is opened, edited and written entirely in this browser. Only your email address
-        and a record of each download reach the server.
+        Your PDF is opened, edited and written entirely in this browser. Only your email address,
+        your news preference and a record of each download reach the server.
+      </p>
+
+      <h4 className="help-heading">About</h4>
+      <p className="help-about">
+        Eight Mile PDF is free, built by Eight Mile. We design websites and build web apps and SaaS
+        products for businesses. If you need something built,{' '}
+        <a href={eightmileUrl('help')} {...outbound}>
+          see what we do
+        </a>
+        .
       </p>
     </Modal>
   )

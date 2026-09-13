@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useStore } from '../store'
+import { eightmileUrl, outbound } from '../lib/eightmile'
 import PageView from './PageView'
 
 interface Props {
@@ -69,6 +70,14 @@ export default function Workspace({ onOpenFile, onPick }: Props) {
           <p>
             Click here or drop a file. Click any text on the page to rewrite it — your file stays
             in your browser.
+          </p>
+          {/* The whole card opens the file picker, so the link must not. */}
+          <p className="empty-by" onClick={(e) => e.stopPropagation()}>
+            Free, from{' '}
+            <a href={eightmileUrl('empty-state')} {...outbound}>
+              Eight Mile
+            </a>
+            . We design websites and build SaaS products for businesses.
           </p>
         </div>
       )}

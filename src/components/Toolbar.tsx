@@ -3,6 +3,7 @@ import { useCanRedo, useCanUndo, useHasDoc } from '../store/selectors'
 import { allTools } from '../features/registry'
 import { FAMILIES, familyLabel } from '../lib/fonts'
 import { clamp } from '../lib/colors'
+import { EIGHTMILE_HOME, eightmileUrl, outbound } from '../lib/eightmile'
 import { applyStyle, shownStyleFrom } from '../actions/style'
 import { commitSession } from '../features/text-edit/session'
 import type { FontFamily, ToolDef } from '../types'
@@ -51,13 +52,16 @@ export default function Toolbar({ onOpen, onExport, onHelp, right }: Props) {
   return (
     <header className="toolbar">
       <div className="toolbar-row">
-        <a className="brand" href="https://eightmile.co.uk">
+        <a className="brand" href={eightmileUrl('brand', EIGHTMILE_HOME)} {...outbound}>
           <span className="brand-mark">
             <img src="/eight-mile-pdf-logo.png" alt="" />
           </span>
           <span className="brand-name">
             Eight Mile <span>PDF</span>
           </span>
+        </a>
+        <a className="brand-by" href={eightmileUrl('header')} {...outbound}>
+          by Eight Mile · websites &amp; web apps
         </a>
 
         <button className="btn" onClick={onOpen}>

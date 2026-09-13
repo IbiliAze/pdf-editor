@@ -32,7 +32,7 @@ export async function gatedDownload(run: DownloadRunner, label = 'PDF'): Promise
 }
 
 async function runAndRecord(run: DownloadRunner): Promise<void> {
-  const { setStatus } = store.get()
+  const { setStatus, setLastDownloadAt } = store.get()
   setStatus({ type: 'info', msg: 'Preparing PDF…' })
   try {
     const result = await run()
@@ -44,6 +44,7 @@ async function runAndRecord(run: DownloadRunner): Promise<void> {
           ? `Downloaded ${files[0].fileName}.`
           : `Downloaded ${files.length} files.`,
     })
+    setLastDownloadAt(Date.now())
     // Bookkeeping only; a failure here must never look like a failed download.
     for (const file of files) {
       api

@@ -4,6 +4,7 @@ import Toolbar from './components/Toolbar'
 import Workspace from './components/Workspace'
 import PasswordPrompt from './components/PasswordPrompt'
 import HelpDialog from './components/HelpDialog'
+import DownloadDoneCard from './components/DownloadDoneCard'
 import { useStore } from './store'
 import { PasswordRequiredError } from './store/documentSlice'
 import { useDragInteraction } from './hooks/useDragInteraction'
@@ -117,6 +118,7 @@ export default function App() {
       {hasDoc && <div className="hintbar">{toolById(tool)?.hint}</div>}
       {status && <div className={`notice ${status.type}`}>{status.msg}</div>}
       {loading && <div className="notice info">Loading PDF…</div>}
+      <DownloadDoneCard />
 
       <div className="body">
         <PageSidebar />

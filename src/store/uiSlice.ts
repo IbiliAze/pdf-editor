@@ -12,6 +12,7 @@ export const createUiSlice: StateCreator<EditorStore, [], [], UiSlice> = (set) =
   showFormFields: true,
   searchMatches: [],
   searchIndex: 0,
+  lastDownloadAt: null,
 
   setZoom: (zoom) => set({ zoom, fitMode: 'none' }),
 
@@ -34,4 +35,5 @@ export const createUiSlice: StateCreator<EditorStore, [], [], UiSlice> = (set) =
   setStatus: (status) => set({ status }),
   setShowFormFields: (showFormFields) => set({ showFormFields }),
   setSearchResults: (searchMatches, searchIndex) => set({ searchMatches, searchIndex }),
+  setLastDownloadAt: (lastDownloadAt) => set({ lastDownloadAt }),
 })

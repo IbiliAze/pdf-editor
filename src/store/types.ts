@@ -127,6 +127,8 @@ export interface UiSlice {
   showFormFields: boolean
   searchMatches: SearchMatch[]
   searchIndex: number
+  /** when the last download finished, so the post-download card knows to show */
+  lastDownloadAt: number | null
 
   setZoom: (z: number) => void
   zoomStep: (dir: 1 | -1) => void
@@ -137,6 +139,7 @@ export interface UiSlice {
   setStatus: (s: Status | null) => void
   setShowFormFields: (v: boolean) => void
   setSearchResults: (matches: SearchMatch[], index: number) => void
+  setLastDownloadAt: (at: number | null) => void
 }
 
 export type EditorStore = DocumentSlice & ElementsSlice & EditorSlice & UiSlice & AssetsSlice

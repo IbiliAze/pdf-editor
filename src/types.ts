@@ -261,6 +261,8 @@ export interface LineSession {
   baseColor: string
   font: FontSpec
   size: number
+  /** where to put the caret on open; the whole run is selected when absent */
+  caret?: number
 }
 
 /** An open editor over a whole paragraph. */

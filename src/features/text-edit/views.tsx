@@ -112,12 +112,17 @@ export function LineEditor({
 }) {
   const ref = useRef<HTMLInputElement>(null)
 
+  // Clicking into the middle of a run should leave the caret there, so a
+  // single word can be changed without retyping the line.
+  const caret = session.caret
   useEffect(() => {
     const el = ref.current
-    if (el) {
-      el.focus()
-      el.select()
-    }
+    if (!el) return
+    el.focus()
+    if (caret == null) el.select()
+    else el.setSelectionRange(caret, caret)
+    // Only on mount: later caret changes come from the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const css = cssFontFor(session.font)
@@ -173,11 +178,12 @@ export function BlockEditor({
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
+    // A paragraph is long enough that selecting it all would make one keypress
+    // destroy the text, so the caret goes to the start instead.
     const el = ref.current
-    if (el) {
-      el.focus()
-      el.select()
-    }
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(0, 0)
   }, [])
 
   const css = cssFontFor(session.font)

@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import { registerFeature } from '../registry'
+import './embeddedFonts'
 import { drawBlockEdit, drawEdit } from './draw'
 import { BlockEditCover, EditCover } from './views'
 import type { ElementKind } from '../../types'
@@ -56,4 +57,5 @@ registerFeature({
 
 export * from './types'
 export * from './session'
+export { clearEmbeddedFontCache } from './embeddedFonts'
 export { LineEditor, BlockEditor } from './views'

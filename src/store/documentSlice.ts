@@ -3,6 +3,7 @@ import { pdfjsLib } from '../lib/pdfjs'
 import { createPages } from '../lib/pageModel'
 import { extractRawItems, groupIntoBlocks, projectLines } from '../lib/textLayer'
 import type { RawItem } from '../lib/textLayer'
+import { clearEmbeddedFontCache } from '../features/text-edit/embeddedFonts'
 import { baseName, sid } from '../lib/utils'
 import { totalRotation } from '../types'
 import type { Page, SourceDoc } from '../types'
@@ -80,6 +81,7 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
         }
       }
       clearRawCache()
+      clearEmbeddedFontCache()
       set({
         sources: { [source.id]: source },
         pages,
@@ -163,6 +165,7 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
       }
     }
     clearRawCache()
+    clearEmbeddedFontCache()
     set({
       sources: {},
       pages: [],

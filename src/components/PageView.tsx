@@ -171,7 +171,7 @@ export default function PageView({ page, index }: Props) {
   )
 
   const onLineClick = useCallback(
-    (line: Line) => {
+    (line: Line, caretU?: number) => {
       const s = useStore.getState()
       if (s.tool === 'editpara' && line.blockId) {
         const block = s.pageText[page.id]?.blocks.find((b) => b.id === line.blockId)
@@ -186,7 +186,7 @@ export default function PageView({ page, index }: Props) {
           return
         }
       }
-      startLineEdit(line, canvasRef.current, page.width)
+      startLineEdit(line, canvasRef.current, page.width, caretU)
     },
     [page],
   )
@@ -295,7 +295,7 @@ function LineHit({
   line: Line
   zoom: number
   mode: 'line' | 'block'
-  onActivate: (line: Line) => void
+  onActivate: (line: Line, caretU?: number) => void
 }) {
   if (mode === 'block' && !line.blockId) return null
   if (blockEditForLine(line)) return null
@@ -313,7 +313,10 @@ function LineHit({
         // would otherwise blur (and instantly close) the editor this opens.
         e.preventDefault()
         e.stopPropagation()
-        onActivate(line)
+        // offsetX is in the hit box's own space, so it already accounts for the
+        // rotation applied to angled runs.
+        const offset = (e.nativeEvent as PointerEvent).offsetX
+        onActivate(line, Number.isFinite(offset) ? line.x - pad + offset / zoom : undefined)
       }}
       onMouseDown={(e) => e.preventDefault()}
     />

@@ -59,7 +59,9 @@ export type EmbeddedFontLookup = (fontKey: string) => Promise<EmbeddedFont | nul
  *
  * Subset fonts only carry the glyphs the document used, and fonts pdf.js
  * rebuilt from a CID font can have a synthetic cmap, so coverage is checked
- * character by character rather than trusted.
+ * character by character. Spaces are checked like any other character: a PDF
+ * often positions words with text-space offsets instead of a space glyph, and
+ * a font without one draws .notdef boxes between every word.
  */
 export function fontUsable(bytes: Uint8Array, sample: string): boolean {
   if (!bytes?.length) return false
@@ -69,8 +71,8 @@ export function fontUsable(bytes: Uint8Array, sample: string): boolean {
     for (const ch of sample) {
       const cp = ch.codePointAt(0)
       if (cp == null) continue
-      // whitespace is always safe to substitute
-      if (cp === 32 || cp === 9 || cp === 10 || cp === 13) continue
+      // newlines are drawn as line breaks, never as glyphs
+      if (cp === 10 || cp === 13) continue
       if (!font.hasGlyphForCodePoint(cp)) return false
     }
     return true

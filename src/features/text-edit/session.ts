@@ -1,9 +1,28 @@
 import { store } from '../../store'
 import { nid } from '../../lib/ids'
 import { lineBBox, partialEdit, sampleRectColors } from '../../lib/textLayer'
+import { measureText } from '../../lib/fonts'
 import { unionRect } from '../../lib/geometry'
-import type { BlockSession, Line, LineSession, TextBlock } from '../../types'
+import type { BlockSession, FontSpec, Line, LineSession, TextBlock } from '../../types'
 import type { BlockEditElement, EditElement } from './types'
+
+/** Character index nearest to `offset` display units into the run. */
+function caretIndexAt(text: string, offset: number, size: number, font: FontSpec): number {
+  if (offset <= 0) return 0
+  let best = 0
+  let bestDelta = Infinity
+  for (let i = 0; i <= text.length; i++) {
+    const w = measureText(text.slice(0, i), size, font)
+    const delta = Math.abs(w - offset)
+    if (delta < bestDelta) {
+      bestDelta = delta
+      best = i
+    } else if (w > offset) {
+      break
+    }
+  }
+  return best
+}
 
 const findEdit = (lineId: string): EditElement | undefined =>
   store.get().elements.find((el): el is EditElement => el.type === 'edit' && el.lineId === lineId)
@@ -23,6 +42,8 @@ export function startLineEdit(
   line: Line,
   canvas: HTMLCanvasElement | null,
   pageWidth: number,
+  /** distance along the baseline that was clicked, for caret placement */
+  caretU?: number,
 ): void {
   const s = store.get()
   if (s.session) commitSession()
@@ -40,16 +61,20 @@ export function startLineEdit(
     color = sampled.color
     baseColor = sampled.color
   }
+  const font = existing?.font ?? line.font
+  const size = existing?.size ?? line.fontHeight
+  const text = existing ? existing.text : line.text
   const session: LineSession = {
     kind: 'line',
     lineId: line.id,
     pageId: line.pageId,
-    text: existing ? existing.text : line.text,
+    text,
     bg,
     color,
     baseColor,
-    font: existing?.font ?? line.font,
-    size: existing?.size ?? line.fontHeight,
+    font,
+    size,
+    caret: caretU == null ? undefined : caretIndexAt(text, caretU - line.x, size, font),
   }
   store.set({ session, selectedIds: [] })
 }

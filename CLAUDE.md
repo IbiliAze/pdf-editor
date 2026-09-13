@@ -115,6 +115,8 @@ a broken app.
 ## Deploy
 
 GitLab CI (`.gitlab-ci.yml`) lints, tests, builds and deploys the swarm stack.
-Don't run deploy steps from a development machine. On the manager,
-`/opt/pdf-editor/api.env` holds the SMTP credentials and is edited by hand, and
-`/opt/pdf-editor/data` is the accounts database.
+Don't run deploy steps from a development machine. The API's environment is
+the protected `PROD_ENV` CI/CD variable (the whole env file; keys listed at the
+end of `.gitlab-ci.yml`), which the pipeline writes to
+`/opt/pdf-editor/api.env` on the manager. `/opt/pdf-editor/data` is the
+accounts database.

@@ -76,17 +76,54 @@ deploy:
       artifacts: true
     - job: test:api
   script:
-    # Static app.
+    # Unique tag per pipeline so Swarm always sees a new image reference and
+    # redeploys, even when only a CI/CD variable changed and the commit didn't.
+    - export TAG="$CI_PIPELINE_ID"
+
+    # The API's whole environment file arrives as one CI/CD variable and is
+    # written where the compose file mounts it. It is not baked into the
+    # image, so the image holds no secrets and a variable change needs no
+    # rebuild, only a redeploy.
+    - test -n "$PROD_ENV" || (echo "PROD_ENV is not set - see the note at the end of this file" && exit 1)
     - sudo mkdir -p /opt/pdf-editor/dist /opt/pdf-editor/data
+    - printf '%s\n' "$PROD_ENV" | sudo tee /opt/pdf-editor/api.env >/dev/null
+    - sudo chmod 600 /opt/pdf-editor/api.env
+
+    # Static app.
     - sudo cp -a dist/. /opt/pdf-editor/dist/
     - sudo cp nginx/default.conf /opt/pdf-editor/nginx.conf
+
     # The API image is built here because the service is pinned to this node.
-    - docker build -t pdf-editor-api:$CI_COMMIT_SHORT_SHA server/
-    - docker tag pdf-editor-api:$CI_COMMIT_SHORT_SHA pdf-editor-api:latest
-    # api.env holds the SMTP credentials and is managed by hand on the manager.
-    - test -f /opt/pdf-editor/api.env || (echo "missing /opt/pdf-editor/api.env - see server/api.env.example" && exit 1)
+    - docker build -t pdf-editor-api:$TAG server/
     - sudo chown -R 1000:1000 /opt/pdf-editor/data
-    - API_IMAGE_TAG=$CI_COMMIT_SHORT_SHA docker stack deploy -c docker-compose.yml pdf-editor
+    - API_IMAGE_TAG=$TAG docker stack deploy --resolve-image never -c docker-compose.yml pdf-editor
+
     - sudo cp pdf-editor.conf /opt/stacks/proxy/conf.d/
     - docker exec $(docker ps -q -f name=proxy_nginx) nginx -t
     - docker exec $(docker ps -q -f name=proxy_nginx) nginx -s reload
+
+    # Drop older images to stop the host filling up.
+    - docker images "pdf-editor-api" --format '{{.Repository}}:{{.Tag}}' | grep -v ":$TAG$" | xargs -r docker rmi -f || true
+
+# Required CI/CD variables (Settings > CI/CD > Variables):
+#
+#   PROD_ENV   protected   The API's full environment file. Start from
+#                          server/api.env.example. Must set:
+#
+#                            DATABASE_PATH=/data/app.db
+#                            APP_ORIGIN=https://pdf-editor.eightmile.co.uk
+#                            SECURE_COOKIES=true
+#                            TRUST_PROXY_HOPS=2
+#                            MAIL_TRANSPORT=smtp
+#                            SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS
+#                            MAIL_FROM=Eight Mile PDF <no-reply@eightmile.co.uk>
+#
+#                          APP_ORIGIN must be the exact origin the editor is
+#                          served from, or the API refuses every write with 403.
+#
+#                          GitLab cannot mask a multi-line value, so mark it
+#                          Protected rather than Masked.
+#
+# Changing it and re-running the pipeline is enough to redeploy: the
+# per-pipeline TAG guarantees Swarm notices. The file lands at
+# /opt/pdf-editor/api.env on the manager, mode 600, and is never committed.

@@ -34,9 +34,10 @@ services:
           - node.role == manager
 
   pdf-editor-api:
-    # Built on the manager by CI and tagged with the commit, so a redeploy of
-    # the same stack actually restarts the service.
+    # Built on the manager by CI and tagged with the pipeline id, so every
+    # pipeline, even one that only changed a variable, restarts the service.
     image: pdf-editor-api:${API_IMAGE_TAG:-latest}
+    # Written by the pipeline from the PROD_ENV CI/CD variable.
     env_file:
       - /opt/pdf-editor/api.env
     volumes:

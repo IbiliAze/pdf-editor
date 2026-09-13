@@ -260,13 +260,11 @@ shared proxy.
 Both services join the shared `monitoring-network` overlay and publish no host
 ports; the proxy reaches them as `pdf-editor:80` and `pdf-editor-api:3000`.
 
-Before the first deploy, on the manager:
+The API's configuration comes from one protected CI/CD variable, `PROD_ENV`,
+holding the whole environment file (start from `server/api.env.example`; the
+required keys are listed at the end of `.gitlab-ci.yml`). The pipeline writes
+it to `/opt/pdf-editor/api.env` on the manager, mode 600, where the compose
+file mounts it. Change the variable and re-run the pipeline to redeploy: the
+image is tagged with the pipeline id, so Swarm always restarts the service.
 
-```sh
-sudo mkdir -p /opt/pdf-editor/data
-sudo cp server/api.env.example /opt/pdf-editor/api.env   # then fill it in
-sudo chown -R 1000:1000 /opt/pdf-editor/data
-```
-
-`api.env` holds the SMTP credentials and is managed by hand. **Back up
-`/opt/pdf-editor/data`** — it is the accounts database.
+**Back up `/opt/pdf-editor/data`** — it is the accounts database.

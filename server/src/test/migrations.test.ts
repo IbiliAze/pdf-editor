@@ -20,6 +20,21 @@ describe('migrations', () => {
     db.close()
   })
 
+  it('adds the consent and source columns to an existing database', () => {
+    const db = openDb(':memory:')
+    const columns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+      (c) => c.name,
+    )
+    expect(columns).toEqual(
+      expect.arrayContaining(['marketing_opt_in', 'marketing_opt_in_at', 'signup_source']),
+    )
+    // an account created before the column existed has not consented
+    db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run('a@example.com', 'x')
+    const row = db.prepare('SELECT marketing_opt_in FROM users').get() as { marketing_opt_in: number }
+    expect(row.marketing_opt_in).toBe(0)
+    db.close()
+  })
+
   it('rejects a duplicate address regardless of case', () => {
     const db = openDb(':memory:')
     const insert = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')

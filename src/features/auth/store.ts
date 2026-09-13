@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { ApiError, api } from './api'
 import type { AuthUser } from './api'
+import { signupSource } from '../../lib/attribution'
 
 export type AuthStatus = 'unknown' | 'anon' | 'unverified' | 'verified'
 export type AuthView = 'signin' | 'signup' | 'sent' | 'forgot' | 'forgot-sent' | 'delete' | 'deleted'
@@ -21,7 +22,8 @@ interface AuthState {
   pending: PendingDownload | null
 
   refresh: () => Promise<AuthStatus>
-  signup: (email: string, password: string) => Promise<void>
+  signup: (email: string, password: string, marketingOptIn: boolean) => Promise<void>
+  setMarketingOptIn: (on: boolean) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   resend: () => Promise<void>
@@ -62,16 +64,25 @@ export const useAuth = create<AuthState>()((set, get) => ({
     return status
   },
 
-  signup: async (email, password) => {
+  signup: async (email, password, marketingOptIn) => {
     set({ busy: true, error: null })
     try {
-      const res = await api.signup(email, password)
+      const res = await api.signup(email, password, { marketingOptIn, source: signupSource() })
       if (res.user) set({ user: res.user, status: statusOf(res.user) })
       set({ view: 'sent' })
     } catch (err) {
       set({ error: (err as Error).message })
     } finally {
       set({ busy: false })
+    }
+  },
+
+  setMarketingOptIn: async (on) => {
+    try {
+      const { user } = await api.setPreferences(on)
+      set({ user })
+    } catch {
+      // the menu keeps showing the stored preference, so nothing to undo
     }
   },
 

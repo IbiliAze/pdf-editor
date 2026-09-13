@@ -29,6 +29,7 @@ export default function AuthModal() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [news, setNews] = useState(false)
   const [resent, setResent] = useState(false)
 
   // While the visitor is off clicking the link in their inbox, keep asking
@@ -49,7 +50,7 @@ export default function AuthModal() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (view === 'signin') void login(email.trim(), password)
-    else if (view === 'signup') void signup(email.trim(), password)
+    else if (view === 'signup') void signup(email.trim(), password, news)
     else if (view === 'forgot') void forgot(email.trim())
     else if (view === 'delete') void deleteAccount(password)
   }
@@ -59,7 +60,7 @@ export default function AuthModal() {
       {pending && view !== 'sent' && (
         <p className="modal-lead">
           Creating an account unlocks downloads. Your PDF never leaves this browser — only your
-          email address and a record of the download are stored.
+          email address, your news preference and a record of the download are stored.
         </p>
       )}
 
@@ -87,6 +88,15 @@ export default function AuthModal() {
                 onChange={(e) => setPassword(e.target.value)}
               />
               {view === 'signup' && <span className="hint">At least 8 characters.</span>}
+            </label>
+          )}
+          {view === 'signup' && (
+            <label className="auth-check">
+              <input type="checkbox" checked={news} onChange={(e) => setNews(e.target.checked)} />
+              <span>
+                Send me occasional news from Eight Mile about websites and web apps. Unsubscribe
+                any time.
+              </span>
             </label>
           )}
           {error && <p className="auth-error">{error}</p>}

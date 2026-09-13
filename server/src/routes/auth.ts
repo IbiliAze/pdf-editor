@@ -12,6 +12,7 @@ import {
   findUserByEmail,
   hashPassword,
   markVerified,
+  setMarketingOptIn,
   setPassword,
   verifyPassword,
 } from '../auth.js'
@@ -25,6 +26,12 @@ const credentials = z.object({
   password: z.string().min(8).max(200),
 })
 
+const signupBody = credentials.extend({
+  marketingOptIn: z.boolean().optional(),
+  source: z.string().max(300).optional(),
+})
+const preferencesBody = z.object({ marketingOptIn: z.boolean() })
+
 const emailOnly = z.object({ email: z.email().max(254) })
 const tokenOnly = z.object({ token: z.string().min(10).max(200) })
 
@@ -32,6 +39,7 @@ const publicUser = (user: User) => ({
   email: user.email,
   verified: !!user.verified_at,
   createdAt: user.created_at,
+  marketingOptIn: user.marketing_opt_in === 1,
 })
 
 /** Parse a body, replying 400 with field messages when it does not fit. */
@@ -68,9 +76,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     '/api/auth/signup',
     { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
     async (req, reply) => {
-      const parsed = parse(credentials, req.body)
+      const parsed = parse(signupBody, req.body)
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
-      const { email, password } = parsed.data
+      const { email, password, marketingOptIn, source } = parsed.data
 
       const existing = findUserByEmail(db, email)
       if (existing) {
@@ -82,7 +90,10 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(201).send({ ok: true, verified: false })
       }
 
-      const user = createUser(db, email, await hashPassword(password))
+      const user = createUser(db, email, await hashPassword(password), {
+        marketingOptIn,
+        signupSource: source,
+      })
       const token = createEmailToken(db, user.id, 'verify', VERIFY_TTL_MINUTES)
       await mailer
         .sendVerification(user.email, link('/verify', token))
@@ -120,6 +131,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     if (!req.user) return reply.code(401).send({ error: 'unauthenticated' })
     return reply.send({ user: publicUser(req.user) })
   })
+
+  // Consent can be withdrawn from the account menu, as the signup form promises.
+  app.post(
+    '/api/auth/preferences',
+    { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (req, reply) => {
+      if (!req.user) return reply.code(401).send({ error: 'unauthenticated' })
+      const parsed = parse(preferencesBody, req.body)
+      if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
+      setMarketingOptIn(db, req.user.id, parsed.data.marketingOptIn)
+      return reply.send({ ok: true, user: publicUser(findUserByEmail(db, req.user.email)!) })
+    },
+  )
 
   app.post(
     '/api/auth/verify',

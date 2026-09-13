@@ -18,7 +18,12 @@ vi.mock('../api', async (importOriginal) => {
 const deleteAccount = vi.mocked(api.deleteAccount)
 const downloads = vi.mocked(api.downloads)
 
-const user = (email: string): AuthUser => ({ email, verified: true, createdAt: '2026-01-01 00:00:00' })
+const user = (email: string): AuthUser => ({
+  email,
+  verified: true,
+  createdAt: '2026-01-01 00:00:00',
+  marketingOptIn: false,
+})
 const record = (filename: string): DownloadRecord => ({
   id: 1,
   filename,

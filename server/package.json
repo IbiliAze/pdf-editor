@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "leads": "node dist/scripts/export-leads.js",
+    "leads:dev": "tsx src/scripts/export-leads.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

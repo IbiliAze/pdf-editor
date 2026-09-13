@@ -45,6 +45,13 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX downloads_user ON downloads(user_id, created_at DESC);
   `,
+  // Consent to hear from Eight Mile, given at signup and changeable from the
+  // account menu, plus where the visitor came from when they signed up.
+  `
+  ALTER TABLE users ADD COLUMN marketing_opt_in INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN marketing_opt_in_at TEXT;
+  ALTER TABLE users ADD COLUMN signup_source TEXT;
+  `,
 ]
 
 export function migrate(db: Db): number {

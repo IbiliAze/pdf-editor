@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import type { DownloadRecord } from './api'
 import { useAuth } from './store'
+import { eightmileUrl, outbound } from '../../lib/eightmile'
 
 const formatBytes = (n: number): string => {
   if (!n) return '—'
@@ -21,6 +22,7 @@ export default function AccountMenu() {
   const apiAvailable = useAuth((s) => s.apiAvailable)
   const open = useAuth((s) => s.open)
   const logout = useAuth((s) => s.logout)
+  const setMarketingOptIn = useAuth((s) => s.setMarketingOptIn)
   const [menuOpen, setMenuOpen] = useState(false)
   const [downloads, setDownloads] = useState<DownloadRecord[] | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -102,6 +104,19 @@ export default function AccountMenu() {
                 ))}
               </ul>
             )}
+          </div>
+          <div className="account-news">
+            <label className="auth-check">
+              <input
+                type="checkbox"
+                checked={!!user?.marketingOptIn}
+                onChange={(e) => void setMarketingOptIn(e.target.checked)}
+              />
+              <span>News from Eight Mile</span>
+            </label>
+            <a className="hint" href={eightmileUrl('account')} {...outbound}>
+              What we build
+            </a>
           </div>
           <div className="account-foot">
             <button

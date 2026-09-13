@@ -48,6 +48,62 @@ describe('signup', () => {
     const res = await login('case@example.com')
     expect(res.statusCode).toBe(200)
   })
+
+  it('records consent and where the visitor came from, off by default', async () => {
+    const plain = await signup('a@example.com')
+    expect(plain.json().user.marketingOptIn).toBe(false)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/signup',
+      headers: headers(),
+      payload: { email: 'b@example.com', password: PASSWORD, marketingOptIn: true, source: 'campaign:sept|ref:eightmile.co.uk' },
+    })
+    expect(res.json().user.marketingOptIn).toBe(true)
+    const row = app.db
+      .prepare('SELECT marketing_opt_in, marketing_opt_in_at, signup_source FROM users WHERE email = ?')
+      .get('b@example.com') as { marketing_opt_in: number; marketing_opt_in_at: string; signup_source: string }
+    expect(row.marketing_opt_in).toBe(1)
+    expect(row.marketing_opt_in_at).toBeTruthy()
+    expect(row.signup_source).toBe('campaign:sept|ref:eightmile.co.uk')
+  })
+
+  it('points every mail at the services page', () => {
+    // the first mail is the verification link from beforeEach's clean app
+    return signup('a@example.com').then(() => {
+      expect(app.mailer.sent[0].text).toContain('https://eightmile.co.uk/saas?utm_source=pdf-editor&utm_medium=email&utm_campaign=verify')
+    })
+  })
+})
+
+describe('preferences', () => {
+  const setPrefs = (cookie: string, marketingOptIn: boolean) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/auth/preferences',
+      headers: headers(cookie),
+      payload: { marketingOptIn },
+    })
+
+  it('needs a session', async () => {
+    expect((await setPrefs('', true)).statusCode).toBe(401)
+  })
+
+  it('turns consent on and off and reports it through me', async () => {
+    const cookie = sessionCookie(await signup('a@example.com'))
+    const on = await setPrefs(cookie, true)
+    expect(on.statusCode).toBe(200)
+    expect(on.json().user.marketingOptIn).toBe(true)
+
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(cookie) })
+    expect(me.json().user.marketingOptIn).toBe(true)
+
+    await setPrefs(cookie, false)
+    const row = app.db
+      .prepare('SELECT marketing_opt_in, marketing_opt_in_at FROM users WHERE email = ?')
+      .get('a@example.com') as { marketing_opt_in: number; marketing_opt_in_at: string | null }
+    expect(row).toEqual({ marketing_opt_in: 0, marketing_opt_in_at: null })
+  })
 })
 
 describe('login', () => {

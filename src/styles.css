@@ -853,6 +853,24 @@ body {
   color: #6b7280;
 }
 
+.auth-check {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.45;
+  color: #4b5563 !important;
+  cursor: pointer;
+}
+
+.auth-check input {
+  margin: 2px 0 0;
+  flex: none;
+  accent-color: #ffa800;
+}
+
 .auth-error {
   margin: 0;
   font-size: 12.5px;
@@ -1016,6 +1034,27 @@ body {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-news {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  margin-bottom: 10px;
+  border-top: 1px solid #edeef3;
+  border-bottom: 1px solid #edeef3;
+}
+
+.account-news .auth-check {
+  font-size: 12.5px !important;
+  align-items: center;
+}
+
+.account-news a.hint {
+  color: #b45309;
   white-space: nowrap;
 }
 

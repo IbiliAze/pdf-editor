@@ -10,6 +10,14 @@ export interface User {
   password_hash: string
   verified_at: string | null
   created_at: string
+  marketing_opt_in: number
+  marketing_opt_in_at: string | null
+  signup_source: string | null
+}
+
+export interface SignupExtras {
+  marketingOptIn?: boolean
+  signupSource?: string
 }
 
 export interface SessionRow {
@@ -45,11 +53,28 @@ export function findUserById(db: Db, id: number): User | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined
 }
 
-export function createUser(db: Db, email: string, passwordHash: string): User {
+export function createUser(
+  db: Db,
+  email: string,
+  passwordHash: string,
+  extras: SignupExtras = {},
+): User {
+  const optIn = extras.marketingOptIn ? 1 : 0
   const info = db
-    .prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
-    .run(email, passwordHash)
+    .prepare(
+      `INSERT INTO users (email, password_hash, marketing_opt_in, marketing_opt_in_at, signup_source)
+       VALUES (?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') END, ?)`,
+    )
+    .run(email, passwordHash, optIn, optIn, extras.signupSource ?? null)
   return findUserById(db, Number(info.lastInsertRowid))!
+}
+
+export function setMarketingOptIn(db: Db, userId: number, on: boolean): void {
+  db.prepare(
+    `UPDATE users SET marketing_opt_in = ?,
+       marketing_opt_in_at = CASE WHEN ? = 1 THEN datetime('now') END
+     WHERE id = ?`,
+  ).run(on ? 1 : 0, on ? 1 : 0, userId)
 }
 
 export interface CreatedSession {

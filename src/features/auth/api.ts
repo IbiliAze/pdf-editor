@@ -2,6 +2,12 @@ export interface AuthUser {
   email: string
   verified: boolean
   createdAt: string
+  marketingOptIn: boolean
+}
+
+export interface SignupOptions {
+  marketingOptIn?: boolean
+  source?: string
 }
 
 export interface DownloadRecord {
@@ -62,8 +68,10 @@ const post = <T>(path: string, payload?: unknown) =>
 
 export const api = {
   me: () => request<{ user: AuthUser }>('/api/auth/me'),
-  signup: (email: string, password: string) =>
-    post<{ user?: AuthUser }>('/api/auth/signup', { email, password }),
+  signup: (email: string, password: string, options: SignupOptions = {}) =>
+    post<{ user?: AuthUser }>('/api/auth/signup', { email, password, ...options }),
+  setPreferences: (marketingOptIn: boolean) =>
+    post<{ user: AuthUser }>('/api/auth/preferences', { marketingOptIn }),
   login: (email: string, password: string) =>
     post<{ user: AuthUser }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),

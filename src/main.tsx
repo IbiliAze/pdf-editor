@@ -1,7 +1,10 @@
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ResetPage, VerifyPage } from './features/auth'
+import { captureAttribution } from './lib/attribution'
 import './styles.css'
+
+captureAttribution()
 
 /**
  * Two paths are served by the app itself because the confirmation and reset

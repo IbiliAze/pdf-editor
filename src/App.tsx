@@ -8,6 +8,7 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { toolById } from './features/registry'
 import { downloadPdf } from './actions/exportPdf'
 import { AccountMenu, AuthModal, gatedDownload, useAuth } from './features/auth'
+import { PageSidebar } from './features/pages'
 import { clamp } from './lib/colors'
 
 export default function App() {
@@ -94,6 +95,7 @@ export default function App() {
       {loading && <div className="notice info">Loading PDF…</div>}
 
       <div className="body">
+        <PageSidebar />
         <Workspace onOpenFile={handleOpen} onPick={() => fileInputRef.current?.click()} />
       </div>
 

@@ -3,7 +3,7 @@ import { api } from './api'
 import { useAuth } from './store'
 import type { ExportResult } from '../../actions/exportPdf'
 
-export type DownloadRunner = () => Promise<ExportResult>
+export type DownloadRunner = () => Promise<ExportResult | ExportResult[]>
 
 /**
  * Run a download behind the account gate.
@@ -36,11 +36,20 @@ async function runAndRecord(run: DownloadRunner): Promise<void> {
   setStatus({ type: 'info', msg: 'Preparing PDF…' })
   try {
     const result = await run()
-    setStatus({ type: 'success', msg: `Downloaded ${result.fileName}.` })
+    const files = Array.isArray(result) ? result : [result]
+    setStatus({
+      type: 'success',
+      msg:
+        files.length === 1
+          ? `Downloaded ${files[0].fileName}.`
+          : `Downloaded ${files.length} files.`,
+    })
     // Bookkeeping only; a failure here must never look like a failed download.
-    api
-      .recordDownload(result.fileName, result.pageCount, result.bytes.byteLength)
-      .catch(() => undefined)
+    for (const file of files) {
+      api
+        .recordDownload(file.fileName, file.pageCount, file.bytes.byteLength)
+        .catch(() => undefined)
+    }
   } catch (err) {
     setStatus({ type: 'error', msg: `Export failed: ${(err as Error)?.message ?? err}` })
     throw err

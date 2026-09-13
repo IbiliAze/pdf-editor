@@ -4,6 +4,7 @@ import { createPages } from '../lib/pageModel'
 import { extractRawItems, groupIntoBlocks, projectLines } from '../lib/textLayer'
 import type { RawItem } from '../lib/textLayer'
 import { clearEmbeddedFontCache } from '../features/text-edit/embeddedFonts'
+import { clearThumbnailCache } from '../features/pages/Thumbnail'
 import { baseName, sid } from '../lib/utils'
 import { totalRotation } from '../types'
 import type { Page, SourceDoc } from '../types'
@@ -82,6 +83,7 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
       }
       clearRawCache()
       clearEmbeddedFontCache()
+      clearThumbnailCache()
       set({
         sources: { [source.id]: source },
         pages,
@@ -166,6 +168,7 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
     }
     clearRawCache()
     clearEmbeddedFontCache()
+    clearThumbnailCache()
     set({
       sources: {},
       pages: [],

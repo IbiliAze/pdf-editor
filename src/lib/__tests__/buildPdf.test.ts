@@ -133,6 +133,27 @@ describe('buildPdf', () => {
     expect(sizesOf(out)[3]).toEqual([595, 842])
   })
 
+  it('names the tool in the metadata of both export strategies', async () => {
+    const { state, pages } = await stateFor(await fixture())
+    // pdf-lib stamps its own producer on load unless told not to.
+    const reload = async (bytes: Uint8Array) => PDFDocument.load(bytes, { updateMetadata: false })
+    const inPlace = await reload(await buildPdf(state))
+    expect(inPlace.getProducer()).toContain('pdf-editor.eightmile.co.uk')
+    expect(inPlace.getCreator()).toBe('Eight Mile PDF')
+
+    const blank: Page = {
+      id: 'p-blank',
+      source: { kind: 'blank' },
+      intrinsicRotation: 0,
+      rotation: 0,
+      width: 595,
+      height: 842,
+    }
+    state.pages = [...pages, blank]
+    const rebuilt = await reload(await buildPdf(state))
+    expect(rebuilt.getProducer()).toContain('pdf-editor.eightmile.co.uk')
+  })
+
   it('draws an added text element and grows the file', async () => {
     const bytes = await fixture()
     const { state, pages } = await stateFor(bytes)

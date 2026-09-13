@@ -333,6 +333,10 @@ export async function buildPdf(
   }
 
   opts.onProgress?.('Writing file…', 0.95)
+  // Every file made here says where it came from. Only the producer fields
+  // are touched: an in-place export keeps its title, author and the rest.
+  out.setProducer('Eight Mile PDF · https://pdf-editor.eightmile.co.uk')
+  out.setCreator('Eight Mile PDF')
   let bytes = await out.save()
   if (opts.password?.userPassword && plugins.encrypt) {
     bytes = await plugins.encrypt(bytes, opts.password)

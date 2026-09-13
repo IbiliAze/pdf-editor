@@ -77,30 +77,40 @@ export default function DecorationsPanel() {
                 onChange={(e) => setDecorations({ watermark: { ...watermark, text: e.target.value } })}
               />
               <div className="panel-row">
-                <input
-                  type="number"
-                  min={8}
-                  max={300}
-                  value={watermark.size}
-                  onChange={(e) =>
-                    setDecorations({ watermark: { ...watermark, size: Number(e.target.value) || 72 } })
-                  }
-                />
-                <input
-                  type="number"
-                  min={-90}
-                  max={90}
-                  value={watermark.angle}
-                  title="Angle"
-                  onChange={(e) =>
-                    setDecorations({ watermark: { ...watermark, angle: Number(e.target.value) || 0 } })
-                  }
-                />
-                <input
-                  type="color"
-                  value={watermark.color}
-                  onChange={(e) => setDecorations({ watermark: { ...watermark, color: e.target.value } })}
-                />
+                <label className="mini">
+                  Size
+                  <input
+                    type="number"
+                    min={8}
+                    max={300}
+                    value={watermark.size}
+                    onChange={(e) =>
+                      setDecorations({ watermark: { ...watermark, size: Number(e.target.value) || 72 } })
+                    }
+                  />
+                </label>
+                <label className="mini">
+                  Angle
+                  <input
+                    type="number"
+                    min={-90}
+                    max={90}
+                    value={watermark.angle}
+                    onChange={(e) =>
+                      setDecorations({ watermark: { ...watermark, angle: Number(e.target.value) || 0 } })
+                    }
+                  />
+                </label>
+                <label className="mini">
+                  Colour
+                  <input
+                    type="color"
+                    value={watermark.color}
+                    onChange={(e) =>
+                      setDecorations({ watermark: { ...watermark, color: e.target.value } })
+                    }
+                  />
+                </label>
               </div>
               <label className="rangeline">
                 Opacity
@@ -114,11 +124,15 @@ export default function DecorationsPanel() {
                   }
                 />
               </label>
-              <input
-                value={watermark.pages}
-                title="Pages"
-                onChange={(e) => setDecorations({ watermark: { ...watermark, pages: e.target.value } })}
-              />
+              <label className="mini">
+                Pages
+                <input
+                  value={watermark.pages}
+                  onChange={(e) =>
+                    setDecorations({ watermark: { ...watermark, pages: e.target.value } })
+                  }
+                />
+              </label>
             </div>
           )}
         </section>
@@ -171,33 +185,43 @@ export default function DecorationsPanel() {
                 ))}
               </select>
               <div className="panel-row">
-                <input
-                  type="number"
-                  min={5}
-                  max={48}
-                  value={pageNumbers.size}
-                  onChange={(e) =>
-                    setDecorations({ pageNumbers: { ...pageNumbers, size: Number(e.target.value) || 9 } })
-                  }
-                />
-                <input
-                  type="number"
-                  min={1}
-                  value={pageNumbers.startAt}
-                  title="First number"
-                  onChange={(e) =>
-                    setDecorations({
-                      pageNumbers: { ...pageNumbers, startAt: Number(e.target.value) || 1 },
-                    })
-                  }
-                />
-                <input
-                  type="color"
-                  value={pageNumbers.color}
-                  onChange={(e) =>
-                    setDecorations({ pageNumbers: { ...pageNumbers, color: e.target.value } })
-                  }
-                />
+                <label className="mini">
+                  Size
+                  <input
+                    type="number"
+                    min={5}
+                    max={48}
+                    value={pageNumbers.size}
+                    onChange={(e) =>
+                      setDecorations({
+                        pageNumbers: { ...pageNumbers, size: Number(e.target.value) || 9 },
+                      })
+                    }
+                  />
+                </label>
+                <label className="mini">
+                  Starts at
+                  <input
+                    type="number"
+                    min={1}
+                    value={pageNumbers.startAt}
+                    onChange={(e) =>
+                      setDecorations({
+                        pageNumbers: { ...pageNumbers, startAt: Number(e.target.value) || 1 },
+                      })
+                    }
+                  />
+                </label>
+                <label className="mini">
+                  Colour
+                  <input
+                    type="color"
+                    value={pageNumbers.color}
+                    onChange={(e) =>
+                      setDecorations({ pageNumbers: { ...pageNumbers, color: e.target.value } })
+                    }
+                  />
+                </label>
               </div>
             </div>
           )}
@@ -243,29 +267,35 @@ export default function DecorationsPanel() {
                     />
                   ))}
                   <div className="panel-row">
-                    <select
-                      value={band.font.family}
+                    <label className="mini grow">
+                      Font
+                      <select
+                        value={band.font.family}
                       onChange={(e) =>
                         setDecorations({
                           [which]: { ...band, font: { ...band.font, family: e.target.value as FontFamily } },
                         })
                       }
                     >
-                      {FAMILIES.map((f) => (
-                        <option key={f} value={f}>
-                          {familyLabel(f)}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      min={5}
-                      max={48}
-                      value={band.size}
-                      onChange={(e) =>
-                        setDecorations({ [which]: { ...band, size: Number(e.target.value) || 9 } })
-                      }
-                    />
+                        {FAMILIES.map((f) => (
+                          <option key={f} value={f}>
+                            {familyLabel(f)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="mini">
+                      Size
+                      <input
+                        type="number"
+                        min={5}
+                        max={48}
+                        value={band.size}
+                        onChange={(e) =>
+                          setDecorations({ [which]: { ...band, size: Number(e.target.value) || 9 } })
+                        }
+                      />
+                    </label>
                   </div>
                 </div>
               )}

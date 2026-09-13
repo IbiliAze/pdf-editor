@@ -1112,10 +1112,12 @@ body {
 }
 
 .checkline {
+  display: flex;
   flex-direction: row !important;
   align-items: center;
   gap: 8px !important;
   font-weight: 400 !important;
+  cursor: pointer;
 }
 
 .checkline input {
@@ -1529,6 +1531,11 @@ select.form-input {
   padding-bottom: 12px;
 }
 
+.panel-section > .hint {
+  display: block;
+  margin-top: 5px;
+}
+
 .panel-section:last-child {
   border-bottom: 0;
 }
@@ -1617,4 +1624,27 @@ select.form-input {
   padding: 4px 0;
   color: #4b5563;
   line-height: 1.45;
+}
+
+.mini {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #8891a0;
+  min-width: 0;
+}
+
+.mini.grow {
+  flex: 1;
+}
+
+.mini input,
+.mini select {
+  font-size: 12.5px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #1f2937;
 }

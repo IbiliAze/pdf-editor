@@ -17,6 +17,7 @@ import { totalRotation } from '../types'
 import ElementLayer from './ElementLayer'
 import { FormLayer } from '../features/forms'
 import { MatchLayer } from '../features/search'
+import { DecorationLayer } from '../features/doc-tools'
 import type { EditorElement, ElementEvents, Line, Page } from '../types'
 
 interface Props {
@@ -229,6 +230,7 @@ export default function PageView({ page, index }: Props) {
           <ElementLayer page={page} elements={elements} events={events} />
           <FormLayer page={page} />
           <MatchLayer page={page} />
+          <DecorationLayer page={page} index={index} />
 
           {live && <LivePreview el={live} page={page} zoom={zoom} />}
 

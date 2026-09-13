@@ -216,6 +216,7 @@ function makeCtx(
   rasterised: boolean,
   embedFont: ExportCtx['embedFont'],
   imageCache: Map<string, PDFImage | null>,
+  pdfPageFor: Map<string, PDFPage>,
 ): ExportCtx {
   const size = unrotatedSize(page)
   let viewBox: ViewBox = [0, 0, size.width, size.height]
@@ -244,6 +245,7 @@ function makeCtx(
       imageCache.set(assetId, img)
       return img
     },
+    refForPage: (pageId) => pdfPageFor.get(pageId)?.ref,
     toPdf: (x, y) => apply(inv, x, y),
     rectToPdf: (x, y, w, h) => rectToPdfWith(inv, x, y, w, h),
   }
@@ -281,7 +283,16 @@ export async function buildPdf(
     if (!pdfPage) continue
     ctxByPage.set(
       page.id,
-      makeCtx(state, out, page, pdfPage, rasterIds.has(page.id), resolver.embed, imageCache),
+      makeCtx(
+        state,
+        out,
+        page,
+        pdfPage,
+        rasterIds.has(page.id),
+        resolver.embed,
+        imageCache,
+        pdfPageFor,
+      ),
     )
   }
 

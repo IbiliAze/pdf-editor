@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './features'
 import Toolbar from './components/Toolbar'
 import Workspace from './components/Workspace'
@@ -11,6 +11,9 @@ import { AccountMenu, AuthModal, gatedDownload, useAuth } from './features/auth'
 import { PageSidebar } from './features/pages'
 import { SignatureHost } from './features/signatures'
 import { SearchPanel } from './features/search'
+import { LinkDialogHost } from './features/annotations'
+import { DecorationsPanel, ExportDialog } from './features/doc-tools'
+import type { ExportRequest } from './features/doc-tools'
 import { clamp } from './lib/colors'
 
 export default function App() {
@@ -46,9 +49,16 @@ export default function App() {
     [openFile, setStatus],
   )
 
-  const handleExport = useCallback(async () => {
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = useCallback(() => {
     if (!useStore.getState().pages.length) return
-    await gatedDownload(() => downloadPdf()).catch(() => undefined)
+    setExporting(true)
+  }, [])
+
+  const runExport = useCallback(async (request: ExportRequest) => {
+    setExporting(false)
+    await gatedDownload(() => downloadPdf(request)).catch(() => undefined)
   }, [])
 
   useKeyboard(handleExport)
@@ -100,10 +110,15 @@ export default function App() {
         <PageSidebar />
         <Workspace onOpenFile={handleOpen} onPick={() => fileInputRef.current?.click()} />
         <SearchPanel />
+        <DecorationsPanel />
       </div>
 
       <AuthModal />
       <SignatureHost />
+      <LinkDialogHost />
+      {exporting && (
+        <ExportDialog onClose={() => setExporting(false)} onConfirm={runExport} />
+      )}
     </div>
   )
 }

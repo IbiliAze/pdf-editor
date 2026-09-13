@@ -1,7 +1,7 @@
 import { registerExportPlugin } from '../../lib/export/buildPdf'
 import type { ExportState } from '../../lib/export/buildPdf'
 import type { PDFDocument, PDFFont, PDFRadioGroup } from 'pdf-lib'
-import { StandardFonts, rgb } from 'pdf-lib'
+import { PDFNull, PDFRef, StandardFonts, rgb } from 'pdf-lib'
 import { drawDisplayText } from '../../lib/export/drawText'
 import { currentValue } from './extract'
 import type { ExportCtx, FormField, FormValue } from '../../types'
@@ -69,6 +69,7 @@ async function applyForms(
       if (flatten) {
         try {
           form.flatten()
+          fillObjectGaps(doc)
         } catch {
           // leave the form in place rather than failing the export
         }
@@ -108,6 +109,22 @@ function drawField(ctx: ExportCtx, field: FormField, value: FormValue, font: PDF
     font,
     color: '#111827',
   })
+}
+
+/**
+ * Give every deleted object number a null object again.
+ *
+ * Flattening removes the form's objects, and the cross-reference table pdf-lib
+ * then writes has no entry for those numbers, which strict readers reject. A
+ * null object is a valid, ignorable placeholder that keeps the table whole.
+ */
+function fillObjectGaps(doc: PDFDocument): void {
+  const context = doc.context
+  const present = new Set<number>()
+  for (const [ref] of context.enumerateIndirectObjects()) present.add(ref.objectNumber)
+  for (let n = 1; n <= context.largestObjectNumber; n++) {
+    if (!present.has(n)) context.assign(PDFRef.of(n), PDFNull)
+  }
 }
 
 /**

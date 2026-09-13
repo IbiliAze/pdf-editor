@@ -354,6 +354,8 @@ export interface ExportCtx {
   }
   embedFont: (spec: FontSpec, sample?: string, fontKey?: string) => Promise<PDFFont>
   embedImage: (assetId: string) => Promise<import('pdf-lib').PDFImage | null>
+  /** reference of another output page, for in-document links */
+  refForPage: (pageId: string) => import('pdf-lib').PDFRef | undefined
   linesById: Record<string, Line>
   blocksById: Record<string, TextBlock>
   modelPage: Page

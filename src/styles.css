@@ -1426,3 +1426,133 @@ select.form-input {
     box-shadow: 0 0 32px rgba(15, 23, 42, 0.22);
   }
 }
+
+/* ---------- notes and links ---------- */
+
+.el-note {
+  border-radius: 3px 3px 3px 0;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(17, 24, 39, 0.7);
+  cursor: pointer;
+  z-index: 9;
+}
+
+.note-mark {
+  pointer-events: none;
+}
+
+.note-popover {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 6px;
+  width: 210px;
+  background: #fff;
+  border: 1px solid #e3e5ec;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.2);
+  padding: 6px;
+  z-index: 30;
+}
+
+.note-popover textarea {
+  width: 100%;
+  min-height: 82px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  font: inherit;
+  font-size: 12.5px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.el-link {
+  border: 1px dashed rgba(37, 99, 235, 0.75);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* ---------- document decorations ---------- */
+
+.decoration-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.deco-watermark {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.deco-band {
+  position: absolute;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.panel-section {
+  border-bottom: 1px solid #edeef3;
+  padding-bottom: 12px;
+}
+
+.panel-section:last-child {
+  border-bottom: 0;
+}
+
+.panel-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.panel-fields input,
+.panel-fields select {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 7px;
+  border: 1px solid #d8dae3;
+  border-radius: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.panel-fields input[type='color'] {
+  padding: 2px;
+  height: 30px;
+}
+
+.rangeline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.rangeline input[type='range'] {
+  flex: 1;
+}
+
+.callout {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.callout p {
+  margin: 4px 0 8px;
+  color: #7c2d12;
+}

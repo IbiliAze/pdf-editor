@@ -67,6 +67,8 @@ export interface SourceDoc {
   pdfjs: PDFDocumentProxy
   pageCount: number
   encrypted: boolean
+  /** an XFA-only form: its fields live in XML, not in AcroForm widgets */
+  xfaOnly?: boolean
 }
 
 export type PageSource =

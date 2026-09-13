@@ -6,6 +6,16 @@ stages:
 default:
   tags:
     - app-primary
+  cache:
+    # Keyed on the lockfiles: a dependency change invalidates it, an ordinary
+    # commit reuses it.
+    key:
+      files:
+        - package-lock.json
+        - server/package-lock.json
+    paths:
+      - node_modules/
+      - server/node_modules/
 
 .node: &node
   before_script:

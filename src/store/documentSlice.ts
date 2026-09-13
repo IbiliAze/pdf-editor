@@ -96,6 +96,9 @@ export async function loadSource(
     pdfjs: doc,
     pageCount: doc.numPages,
     encrypted,
+    // XFA forms carry their fields in an XML payload instead of AcroForm
+    // widgets, so nothing here can find or fill them.
+    xfaOnly: !!doc.isPureXfa,
   }
   return { source, pages: createPages(source.id, sizes) }
 }
@@ -128,6 +131,14 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
       clearRawCache()
       clearEmbeddedFontCache()
       clearThumbnailCache()
+      if (source.xfaOnly) {
+        set({
+          status: {
+            type: 'info',
+            msg: 'This is an XFA form. Its fields cannot be filled here, but everything else works.',
+          },
+        })
+      }
       set({
         sources: { [source.id]: source },
         pages,

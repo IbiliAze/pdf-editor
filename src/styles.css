@@ -389,7 +389,12 @@ body {
 }
 
 .line-editor,
-.text-el.editing {
+.block-editor,
+.text-el.editing,
+.form-input {
+  /* The overlay sets user-select: none to stop long-press callouts on touch;
+     anything the user types into has to opt back in or the browser refuses
+     keyboard input. */
   -webkit-user-select: text;
   user-select: text;
 }
@@ -1288,4 +1293,136 @@ body {
   cursor: pointer;
   color: #6b7280;
   padding: 0;
+}
+
+/* ---------- form fields ---------- */
+
+.form-input,
+.form-check {
+  position: absolute;
+  font-family: inherit;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  background: rgba(191, 219, 254, 0.28);
+  border-radius: 2px;
+  padding: 0 3px;
+  color: #111827;
+  z-index: 6;
+}
+
+.form-input:focus,
+.form-check:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+  background: #fff;
+}
+
+textarea.form-input {
+  resize: none;
+  padding: 2px 3px;
+  line-height: 1.25;
+}
+
+select.form-input {
+  padding: 0 2px;
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.form-check.checked {
+  background: rgba(191, 219, 254, 0.5);
+}
+
+.form-check:disabled,
+.form-input[readonly] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ---------- redaction ---------- */
+
+.el-redact {
+  background: #111827;
+  outline: 1.5px dashed #dc2626;
+  outline-offset: 1px;
+}
+
+/* ---------- side panels ---------- */
+
+.panel {
+  width: 260px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-left: 1px solid #dfe1e9;
+  min-height: 0;
+}
+
+.panel-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.panel-input {
+  font: inherit;
+  padding: 8px 9px;
+  border: 1px solid #d8dae3;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.panel-input:focus {
+  outline: 2px solid #ffa800;
+  outline-offset: -1px;
+  border-color: #ffa800;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.panel-row .spacer {
+  flex: 1;
+}
+
+.panel-row .btn {
+  padding: 5px 9px;
+}
+
+.match {
+  position: absolute;
+  border: 1px solid rgba(37, 99, 235, 0.7);
+  background: rgba(59, 130, 246, 0.22);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.match.current {
+  background: rgba(255, 168, 0, 0.45);
+  border-color: #d97706;
+}
+
+@media (max-width: 960px) {
+  .panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 40;
+    box-shadow: 0 0 32px rgba(15, 23, 42, 0.22);
+  }
 }

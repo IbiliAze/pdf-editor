@@ -22,6 +22,11 @@ export const store = {
   subscribe: useStore.subscribe,
 }
 
+// Handy during development and for driving the app from a test harness.
+if (import.meta.env?.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as { __emStore: typeof store }).__emStore = store
+}
+
 export { useShallow }
 export * from './selectors'
 export type { EditorStore } from './types'

@@ -1,13 +1,14 @@
 import type { StateCreator } from 'zustand'
 import { pdfjsLib } from '../lib/pdfjs'
 import { createPages } from '../lib/pageModel'
+import { extractFormFields } from '../features/forms/extract'
 import { extractRawItems, groupIntoBlocks, projectLines } from '../lib/textLayer'
 import type { RawItem } from '../lib/textLayer'
 import { clearEmbeddedFontCache } from '../features/text-edit/embeddedFonts'
 import { clearThumbnailCache } from '../features/pages/Thumbnail'
 import { baseName, sid } from '../lib/utils'
 import { totalRotation } from '../types'
-import type { Page, SourceDoc } from '../types'
+import type { FormField, Page, SourceDoc } from '../types'
 import type { DocumentSlice, EditorStore, PageText } from './types'
 
 /**
@@ -129,8 +130,11 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
     }
     set((s) => ({ pendingText: { ...s.pendingText, [pageId]: true } }))
     try {
-      const text = await buildPageText(get, page)
-      set((s) => ({ pageText: { ...s.pageText, [pageId]: text } }))
+      const { text, fields } = await buildPageText(get, page)
+      set((s) => ({
+        pageText: { ...s.pageText, [pageId]: text },
+        formFields: { ...s.formFields, [pageId]: fields },
+      }))
     } catch {
       set((s) => ({ pageText: { ...s.pageText, [pageId]: { lines: [], blocks: [] } } }))
     } finally {
@@ -189,11 +193,15 @@ export const createDocumentSlice: StateCreator<EditorStore, [], [], DocumentSlic
   },
 })
 
-/** Extract (or re-project) the text of one page at its current rotation. */
-async function buildPageText(get: () => EditorStore, page: Page): Promise<PageText> {
-  if (page.source.kind === 'blank') return { lines: [], blocks: [] }
+/** Extract the text and fillable fields of one page at its current rotation. */
+async function buildPageText(
+  get: () => EditorStore,
+  page: Page,
+): Promise<{ text: PageText; fields: FormField[] }> {
+  const empty = { text: { lines: [], blocks: [] }, fields: [] }
+  if (page.source.kind === 'blank') return empty
   const src = get().sources[page.source.docId]
-  if (!src) return { lines: [], blocks: [] }
+  if (!src) return empty
 
   const key = rawKey(page.source.docId, page.source.pageIndex)
   let raw = rawCache.get(key)
@@ -205,5 +213,6 @@ async function buildPageText(get: () => EditorStore, page: Page): Promise<PageTe
   const vp = pdfPage.getViewport({ scale: 1, rotation: totalRotation(page) })
   const lines = projectLines(raw, vp, page.id)
   const blocks = groupIntoBlocks(lines)
-  return { lines, blocks }
+  const fields = await extractFormFields(pdfPage, vp, page.id)
+  return { text: { lines, blocks }, fields }
 }

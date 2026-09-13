@@ -10,6 +10,7 @@ import { downloadPdf } from './actions/exportPdf'
 import { AccountMenu, AuthModal, gatedDownload, useAuth } from './features/auth'
 import { PageSidebar } from './features/pages'
 import { SignatureHost } from './features/signatures'
+import { SearchPanel } from './features/search'
 import { clamp } from './lib/colors'
 
 export default function App() {
@@ -98,6 +99,7 @@ export default function App() {
       <div className="body">
         <PageSidebar />
         <Workspace onOpenFile={handleOpen} onPick={() => fileInputRef.current?.click()} />
+        <SearchPanel />
       </div>
 
       <AuthModal />

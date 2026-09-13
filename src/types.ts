@@ -246,6 +246,22 @@ export interface DocDecorations {
 }
 
 // ---------------------------------------------------------------------------
+// search
+// ---------------------------------------------------------------------------
+
+export interface SearchMatch {
+  pageId: string
+  lineId: string
+  /** character offsets within the run's text */
+  start: number
+  end: number
+  /** display-space box around the matched characters */
+  rect: Rect
+  angle: number
+  text: string
+}
+
+// ---------------------------------------------------------------------------
 // editor sessions
 // ---------------------------------------------------------------------------
 

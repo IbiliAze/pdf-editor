@@ -7,6 +7,7 @@ import type {
   Line,
   Page,
   Rect,
+  SearchMatch,
   SourceDoc,
   Status,
   TextBlock,
@@ -124,6 +125,8 @@ export interface UiSlice {
   activePageId: string | null
   status: Status | null
   showFormFields: boolean
+  searchMatches: SearchMatch[]
+  searchIndex: number
 
   setZoom: (z: number) => void
   zoomStep: (dir: 1 | -1) => void
@@ -133,6 +136,7 @@ export interface UiSlice {
   setActivePageId: (id: string | null) => void
   setStatus: (s: Status | null) => void
   setShowFormFields: (v: boolean) => void
+  setSearchResults: (matches: SearchMatch[], index: number) => void
 }
 
 export type EditorStore = DocumentSlice & ElementsSlice & EditorSlice & UiSlice & AssetsSlice

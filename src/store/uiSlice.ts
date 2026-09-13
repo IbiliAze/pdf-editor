@@ -10,6 +10,8 @@ export const createUiSlice: StateCreator<EditorStore, [], [], UiSlice> = (set) =
   activePageId: null,
   status: null,
   showFormFields: true,
+  searchMatches: [],
+  searchIndex: 0,
 
   setZoom: (zoom) => set({ zoom, fitMode: 'none' }),
 
@@ -31,4 +33,5 @@ export const createUiSlice: StateCreator<EditorStore, [], [], UiSlice> = (set) =
   setActivePageId: (activePageId) => set({ activePageId }),
   setStatus: (status) => set({ status }),
   setShowFormFields: (showFormFields) => set({ showFormFields }),
+  setSearchResults: (searchMatches, searchIndex) => set({ searchMatches, searchIndex }),
 })

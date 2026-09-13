@@ -6,7 +6,8 @@
 
 A PDF editor that runs in the browser. Your file is opened, edited and written
 locally — it is never uploaded. Downloading requires a confirmed account, and
-only your email address and a record of each download reach the server.
+only your email address, your news preference and a record of each download
+reach the server.
 
 - **URL:** https://pdf-editor.eightmile.co.uk
 
@@ -203,6 +204,50 @@ the export is produced in the browser, so a determined visitor can always get
 their file. It exists to tie downloads to an account, and it steps aside
 entirely when the API is unreachable, so an outage there never blocks a
 download.
+
+## The funnel to Eight Mile
+
+The tool is free because it introduces people to [Eight Mile](https://eightmile.co.uk),
+which designs websites and builds SaaS products. Every link out of the editor
+goes through `src/lib/eightmile.ts`, which points at `eightmile.co.uk/saas` and
+tags the placement (`utm_campaign=header`, `empty-state`, `help`,
+`post-download`, `account`, `brand`); emails use `utm_medium=email`. That
+tagging is the only measurement: the editor carries no analytics script, and
+attribution is read off the main site's analytics.
+
+Touchpoints: the "by Eight Mile" link in the header, a line under the empty
+state, an About section in the help dialog, a dismissible card after a download
+(quiet for a fortnight once dismissed, per browser), a footer in every email, a
+welcome email on first confirmation, and `Producer`/`Creator` metadata on every
+exported PDF.
+
+Signup has an unticked "news from Eight Mile" box. Consent, the time it was
+given and the tab's signup source (`utm_*` tags and referring host, captured by
+`src/lib/attribution.ts`) are stored on the user row; the account menu lets the
+holder switch consent off, through `POST /api/auth/preferences`. To pull the
+opted-in, confirmed addresses as CSV for the mailing tool:
+
+```sh
+cd server && DATABASE_PATH=./dev.db npm run leads:dev        # development
+docker exec $(docker ps -qf name=pdf-editor_pdf-editor-api) npm run leads > leads.csv   # on the manager
+```
+
+### Pages for search
+
+`index.html` and the other `*.html` files in the repo root are stubs. At build
+time `src/seo/plugin.ts` fills each one from `src/seo/pages.ts`: the title,
+description, social tags and structured data go in the head, and a crawlable
+section of copy (heading, intro, steps, questions, links to the other pages) is
+appended after the app root. The app hides that section as soon as a document
+is open and, on a task page, selects the tool the page is about. Clean URLs
+(`/redact-pdf`) are served by the plugin in development and by nginx's
+`$uri.html` in production. The sitemap is generated from the same list, so a
+new page is one entry in `pages.ts` plus a copy of a stub.
+
+`public/robots.txt` and `public/og-image.png` complete the set. The backlink
+from eightmile.co.uk to the tool, and the `/saas` page itself, live in that
+site's repository. The domain also needs verifying in Google Search Console
+with the sitemap submitted before any of this is indexed.
 
 ## Deploy
 

@@ -47,9 +47,12 @@ contracts.
   (`src/lib/export/buildPdf.ts`).
 - `src/store/`: zustand slices. `src/lib/`: pure logic (text extraction, page
   model, geometry, export).
-- `server/src/routes/auth.ts`: signup, login, logout, me, verify,
+- `server/src/routes/auth.ts`: signup, login, logout, me, preferences, verify,
   resend-verification, forgot-password, reset-password, delete-account.
   `server/src/routes/downloads.ts`: record and list downloads.
+  `server/src/scripts/export-leads.ts`: opted-in addresses as CSV (`npm run leads`).
+- `src/lib/eightmile.ts`: every link to eightmile.co.uk, tagged per placement.
+  Outbound links open in a new tab so the open document is never lost.
 
 ## Conventions
 

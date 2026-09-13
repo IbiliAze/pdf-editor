@@ -135,6 +135,15 @@ export function setPassword(db: Db, userId: number, passwordHash: string): void 
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId)
 }
 
+/**
+ * Close an account for good. Sessions, email tokens and download records all
+ * reference the user with ON DELETE CASCADE, so this one statement takes
+ * everything the server holds about them.
+ */
+export function deleteUser(db: Db, userId: number): void {
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+}
+
 /** Housekeeping: drop expired sessions and spent tokens. */
 export function pruneExpired(db: Db): void {
   db.prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`).run()

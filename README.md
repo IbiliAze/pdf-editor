@@ -188,6 +188,12 @@ so a database leak is not a set of logins. Sign-up and password reset never
 reveal whether an address is registered. Auth routes are rate limited per
 client address, which is why both nginx hops forward the real one.
 
+Account holders can delete their account from the account menu, confirming with
+their password. That deletes the user row, and with it, through `ON DELETE
+CASCADE`, every session, email token and download record. A confirmation is
+then sent to the address that was removed. Backups of `/opt/pdf-editor/data`
+keep a deleted account until they are rotated out.
+
 The download gate is a product decision, not a security boundary: every byte of
 the export is produced in the browser, so a determined visitor can always get
 their file. It exists to tie downloads to an account, and it steps aside

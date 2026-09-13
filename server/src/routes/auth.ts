@@ -8,6 +8,7 @@ import {
   createUser,
   deleteAllSessions,
   deleteSession,
+  deleteUser,
   findUserByEmail,
   hashPassword,
   markVerified,
@@ -151,6 +152,31 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       await mailer
         .sendVerification(req.user.email, link('/verify', token))
         .catch((err) => app.log.error({ err }, 'verification mail failed'))
+      return reply.send({ ok: true })
+    },
+  )
+
+  app.post(
+    '/api/auth/delete-account',
+    { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
+    async (req, reply) => {
+      if (!req.user) return reply.code(401).send({ error: 'unauthenticated' })
+      const parsed = parse(z.object({ password: z.string().min(1).max(200) }), req.body)
+      if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
+      // The password is asked for again so a borrowed session cannot close
+      // someone's account.
+      if (!(await verifyPassword(parsed.data.password, req.user.password_hash))) {
+        return reply
+          .code(401)
+          .send({ error: 'bad_credentials', message: 'That password is not right.' })
+      }
+      const { id, email } = req.user
+      deleteUser(db, id)
+      req.user = undefined
+      reply.clearCookie(SESSION_COOKIE, { path: '/' })
+      await mailer
+        .sendAccountDeleted(email)
+        .catch((err) => app.log.warn({ err }, 'deletion mail failed'))
       return reply.send({ ok: true })
     },
   )

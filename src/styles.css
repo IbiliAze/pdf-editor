@@ -199,6 +199,16 @@ body {
   background: #f09b00;
 }
 
+.btn.danger {
+  background: #dc2626;
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
 .btn.toggle {
   padding: 6px 9px;
 }
@@ -795,6 +805,24 @@ body {
   padding: 8px 10px;
 }
 
+.auth-warning {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #7f1d1d;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-warning p {
+  margin: 0;
+}
+
+.auth-warning p + p {
+  margin-top: 6px;
+}
+
 .auth-sent p {
   margin: 0 0 10px;
   font-size: 13.5px;
@@ -932,6 +960,17 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.linkish.danger {
+  color: #b91c1c;
 }
 
 /* ---------- standalone pages (verify, reset) ---------- */

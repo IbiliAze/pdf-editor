@@ -34,13 +34,20 @@ export default function AccountMenu() {
     return () => window.removeEventListener('pointerdown', onDown)
   }, [menuOpen])
 
+  // Fetched on every open and keyed on the account, so the list is never stale
+  // and never shows one account's history to whoever signs in next.
   useEffect(() => {
-    if (!menuOpen || downloads) return
+    if (!menuOpen) return
+    let live = true
+    setDownloads(null)
     api
       .downloads()
-      .then((r) => setDownloads(r.downloads))
-      .catch(() => setDownloads([]))
-  }, [menuOpen, downloads])
+      .then((r) => live && setDownloads(r.downloads))
+      .catch(() => live && setDownloads([]))
+    return () => {
+      live = false
+    }
+  }, [menuOpen, user?.email])
 
   if (!apiAvailable || status === 'unknown') return null
 
@@ -96,15 +103,26 @@ export default function AccountMenu() {
               </ul>
             )}
           </div>
-          <button
-            className="btn block"
-            onClick={() => {
-              setMenuOpen(false)
-              void logout()
-            }}
-          >
-            Sign out
-          </button>
+          <div className="account-foot">
+            <button
+              className="btn block"
+              onClick={() => {
+                setMenuOpen(false)
+                void logout()
+              }}
+            >
+              Sign out
+            </button>
+            <button
+              className="linkish danger"
+              onClick={() => {
+                setMenuOpen(false)
+                open('delete', null)
+              }}
+            >
+              Delete account
+            </button>
+          </div>
         </div>
       )}
     </div>

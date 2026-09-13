@@ -8,6 +8,8 @@ const TITLES: Record<string, string> = {
   sent: 'Check your email',
   forgot: 'Reset your password',
   'forgot-sent': 'Check your email',
+  delete: 'Delete your account',
+  deleted: 'Account deleted',
 }
 
 export default function AuthModal() {
@@ -21,6 +23,7 @@ export default function AuthModal() {
   const login = useAuth((s) => s.login)
   const signup = useAuth((s) => s.signup)
   const forgot = useAuth((s) => s.forgot)
+  const deleteAccount = useAuth((s) => s.deleteAccount)
   const resend = useAuth((s) => s.resend)
   const refresh = useAuth((s) => s.refresh)
 
@@ -48,6 +51,7 @@ export default function AuthModal() {
     if (view === 'signin') void login(email.trim(), password)
     else if (view === 'signup') void signup(email.trim(), password)
     else if (view === 'forgot') void forgot(email.trim())
+    else if (view === 'delete') void deleteAccount(password)
   }
 
   return (
@@ -124,6 +128,47 @@ export default function AuthModal() {
         </div>
       )}
 
+      {view === 'delete' && (
+        <form onSubmit={submit} className="auth-form">
+          <div className="auth-warning">
+            <p>
+              <strong>This cannot be undone.</strong> The account for{' '}
+              <strong>{user?.email}</strong> and the record of every download made with it are
+              removed from the server.
+            </p>
+            <p>
+              Anything open in the editor stays open. Your PDFs were never uploaded, so there is
+              nothing of them to delete.
+            </p>
+          </div>
+          <label>
+            Password
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span className="hint">Enter your password to confirm.</span>
+          </label>
+          {error && <p className="auth-error">{error}</p>}
+          <button className="btn danger block" type="submit" disabled={busy}>
+            {busy ? 'Deleting…' : 'Delete my account'}
+          </button>
+        </form>
+      )}
+
+      {view === 'deleted' && (
+        <div className="auth-sent">
+          <p>Your account and your download history have been deleted.</p>
+          <p className="hint">You can keep editing. Downloading again needs a new account.</p>
+          <button className="btn primary block" onClick={close}>
+            Done
+          </button>
+        </div>
+      )}
+
       {view === 'forgot-sent' && (
         <p>
           If an account exists for <strong>{email}</strong>, a reset link is on its way. The link
@@ -131,28 +176,35 @@ export default function AuthModal() {
         </p>
       )}
 
-      <div className="auth-switch">
-        {view === 'signin' && (
-          <>
-            <button className="linkish" onClick={() => setView('signup')}>
-              Create an account
+      {view !== 'deleted' && (
+        <div className="auth-switch">
+          {view === 'signin' && (
+            <>
+              <button className="linkish" onClick={() => setView('signup')}>
+                Create an account
+              </button>
+              <button className="linkish" onClick={() => setView('forgot')}>
+                Forgot password?
+              </button>
+            </>
+          )}
+          {view === 'signup' && (
+            <button className="linkish" onClick={() => setView('signin')}>
+              I already have an account
             </button>
-            <button className="linkish" onClick={() => setView('forgot')}>
-              Forgot password?
+          )}
+          {(view === 'forgot' || view === 'forgot-sent') && (
+            <button className="linkish" onClick={() => setView('signin')}>
+              Back to sign in
             </button>
-          </>
-        )}
-        {view === 'signup' && (
-          <button className="linkish" onClick={() => setView('signin')}>
-            I already have an account
-          </button>
-        )}
-        {(view === 'forgot' || view === 'forgot-sent') && (
-          <button className="linkish" onClick={() => setView('signin')}>
-            Back to sign in
-          </button>
-        )}
-      </div>
+          )}
+          {view === 'delete' && (
+            <button className="linkish" onClick={close}>
+              Keep my account
+            </button>
+          )}
+        </div>
+      )}
     </Modal>
   )
 }

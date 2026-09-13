@@ -3,7 +3,7 @@ import { ApiError, api } from './api'
 import type { AuthUser } from './api'
 
 export type AuthStatus = 'unknown' | 'anon' | 'unverified' | 'verified'
-export type AuthView = 'signin' | 'signup' | 'sent' | 'forgot' | 'forgot-sent'
+export type AuthView = 'signin' | 'signup' | 'sent' | 'forgot' | 'forgot-sent' | 'delete' | 'deleted'
 
 export interface PendingDownload {
   run: () => Promise<void>
@@ -26,6 +26,7 @@ interface AuthState {
   logout: () => Promise<void>
   resend: () => Promise<void>
   forgot: (email: string) => Promise<void>
+  deleteAccount: (password: string) => Promise<void>
   adoptUser: (user: AuthUser) => void
   open: (view: AuthView, pending?: PendingDownload | null) => void
   close: () => void
@@ -117,6 +118,19 @@ export const useAuth = create<AuthState>()((set, get) => ({
     try {
       await api.forgotPassword(email)
       set({ view: 'forgot-sent' })
+    } catch (err) {
+      set({ error: (err as Error).message })
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  deleteAccount: async (password) => {
+    set({ busy: true, error: null })
+    try {
+      await api.deleteAccount(password)
+      // The server has already ended every session; forget the user here too.
+      set({ user: null, status: 'anon', pending: null, view: 'deleted' })
     } catch (err) {
       set({ error: (err as Error).message })
     } finally {

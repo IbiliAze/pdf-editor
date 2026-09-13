@@ -6,6 +6,7 @@ export interface Mailer {
   sendVerification: (to: string, link: string) => Promise<void>
   sendPasswordReset: (to: string, link: string) => Promise<void>
   sendAlreadyRegistered: (to: string, link: string) => Promise<void>
+  sendAccountDeleted: (to: string) => Promise<void>
   /** messages captured in json transport mode; tests read this */
   sent: { to: string; subject: string; text: string }[]
 }
@@ -21,6 +22,12 @@ const layout = (title: string, body: string, action: string, link: string) => `
     If the button does not work, paste this address into your browser:<br>
     <span style="word-break:break-all">${link}</span>
   </p>
+</div>`
+
+const plain = (title: string, body: string) => `
+<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2937">
+  <h1 style="font-size:20px;margin:0 0 12px">${title}</h1>
+  <p style="font-size:14px;line-height:1.6;margin:0">${body}</p>
 </div>`
 
 export function createMailer(config: Config): Mailer {
@@ -71,6 +78,16 @@ export function createMailer(config: Config): Mailer {
           'Choose a new password using the link below. It expires in one hour. If you did not ask for this, you can ignore this email.',
           'Choose a new password',
           link,
+        ),
+      ),
+    sendAccountDeleted: (to) =>
+      send(
+        to,
+        'Your Eight Mile PDF account has been deleted',
+        'Your Eight Mile PDF account and its download history have been deleted.',
+        plain(
+          'Your account has been deleted',
+          'Your email address and the record of your downloads have been removed from our database, and you can sign up again at any time. Deleting an account requires its password, so if this was not you, change that password wherever else you use it.',
         ),
       ),
     sendAlreadyRegistered: (to, link) =>

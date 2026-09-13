@@ -210,6 +210,73 @@ describe('password reset', () => {
   })
 })
 
+describe('delete account', () => {
+  const remove = (cookie: string, password = PASSWORD) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/auth/delete-account',
+      headers: headers(cookie),
+      payload: { password },
+    })
+
+  it('needs a session', async () => {
+    expect((await remove('')).statusCode).toBe(401)
+  })
+
+  it('needs the account password, and keeps the account when it is wrong', async () => {
+    const cookie = sessionCookie(await signup('a@example.com'))
+    const res = await remove(cookie, 'not the password')
+    expect(res.statusCode).toBe(401)
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(cookie) })
+    expect(me.statusCode).toBe(200)
+  })
+
+  it('takes the account, every session and the download history with it', async () => {
+    const created = await signup('a@example.com')
+    const first = sessionCookie(created)
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify',
+      headers: headers(),
+      payload: { token: lastToken(app) },
+    })
+    // a second browser, signed in at the same time
+    const second = sessionCookie(await login('a@example.com'))
+    await app.inject({
+      method: 'POST',
+      url: '/api/downloads',
+      headers: headers(second),
+      payload: { filename: 'edited.pdf', pageCount: 3, byteSize: 1024 },
+    })
+
+    const res = await remove(second)
+    expect(res.statusCode).toBe(200)
+    expect(res.cookies.find((c) => c.name === 'em_session')?.value).toBe('')
+
+    for (const cookie of [first, second]) {
+      const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(cookie) })
+      expect(me.statusCode).toBe(401)
+    }
+    const counts = ['users', 'sessions', 'email_tokens', 'downloads'].map(
+      (t) => (app.db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n,
+    )
+    expect(counts).toEqual([0, 0, 0, 0])
+
+    const mail = app.mailer.sent[app.mailer.sent.length - 1]
+    expect(mail.to).toBe('a@example.com')
+    expect(mail.subject).toMatch(/deleted/i)
+  })
+
+  it('frees the address to be used again', async () => {
+    const cookie = sessionCookie(await signup('a@example.com'))
+    await remove(cookie)
+    const again = await signup('a@example.com')
+    expect(again.statusCode).toBe(201)
+    // a fresh account, not a resurrected one: it is signed in and unverified
+    expect(again.json().user).toMatchObject({ email: 'a@example.com', verified: false })
+  })
+})
+
 describe('request hardening', () => {
   it('rejects a write from another origin', async () => {
     const res = await app.inject({

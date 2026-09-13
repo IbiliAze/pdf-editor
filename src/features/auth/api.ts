@@ -72,6 +72,8 @@ export const api = {
   forgotPassword: (email: string) => post<{ ok: true }>('/api/auth/forgot-password', { email }),
   resetPassword: (token: string, password: string) =>
     post<{ user: AuthUser }>('/api/auth/reset-password', { token, password }),
+  deleteAccount: (password: string) =>
+    post<{ ok: true }>('/api/auth/delete-account', { password }),
   recordDownload: (filename: string, pageCount: number, byteSize: number) =>
     post<{ ok: true }>('/api/downloads', { filename, pageCount, byteSize }),
   downloads: () => request<{ downloads: DownloadRecord[] }>('/api/downloads'),

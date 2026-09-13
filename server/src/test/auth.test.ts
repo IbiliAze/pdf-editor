@@ -109,6 +109,20 @@ describe('email verification', () => {
     expect(me.json().user.verified).toBe(true)
   })
 
+  it('welcomes the account once it is confirmed', async () => {
+    await signup('a@example.com')
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify',
+      headers: headers(),
+      payload: { token: lastToken(app) },
+    })
+    const welcome = app.mailer.sent[app.mailer.sent.length - 1]
+    expect(welcome.to).toBe('a@example.com')
+    expect(welcome.subject).toMatch(/ready/i)
+    expect(welcome.text).toContain('utm_campaign=welcome')
+  })
+
   it('refuses a token a second time', async () => {
     await signup('a@example.com')
     const token = lastToken(app)

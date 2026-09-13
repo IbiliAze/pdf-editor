@@ -138,6 +138,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       // tab or on another device finish the job.
       startSession(user.id, req, reply, clientIp(req))
       const fresh = findUserByEmail(db, user.email)!
+      // Told once, on the first confirmation only: a reset link also verifies
+      // but goes through reset-password, not here.
+      if (!user.verified_at) {
+        await mailer
+          .sendWelcome(fresh.email)
+          .catch((err) => app.log.warn({ err }, 'welcome mail failed'))
+      }
       return reply.send({ ok: true, user: publicUser(fresh) })
     },
   )

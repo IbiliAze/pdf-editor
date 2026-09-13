@@ -7,6 +7,7 @@ import { useDragInteraction } from './hooks/useDragInteraction'
 import { useKeyboard } from './hooks/useKeyboard'
 import { toolById } from './features/registry'
 import { downloadPdf } from './actions/exportPdf'
+import { AccountMenu, AuthModal, gatedDownload, useAuth } from './features/auth'
 import { clamp } from './lib/colors'
 
 export default function App() {
@@ -44,16 +45,15 @@ export default function App() {
 
   const handleExport = useCallback(async () => {
     if (!useStore.getState().pages.length) return
-    setStatus({ type: 'info', msg: 'Preparing PDF…' })
-    try {
-      const result = await downloadPdf()
-      setStatus({ type: 'success', msg: `Downloaded ${result.fileName}.` })
-    } catch (err) {
-      setStatus({ type: 'error', msg: `Export failed: ${(err as Error)?.message ?? err}` })
-    }
-  }, [setStatus])
+    await gatedDownload(() => downloadPdf()).catch(() => undefined)
+  }, [])
 
   useKeyboard(handleExport)
+
+  // Learn who is signed in once, so the download gate never has to guess.
+  useEffect(() => {
+    void useAuth.getState().refresh()
+  }, [])
 
   useEffect(() => {
     if (!status) return
@@ -71,7 +71,12 @@ export default function App() {
       <Toolbar
         onOpen={() => fileInputRef.current?.click()}
         onExport={handleExport}
-        right={docLabel ? <span className="doc-label">{docLabel}</span> : null}
+        right={
+          <>
+            {docLabel && <span className="doc-label">{docLabel}</span>}
+            <AccountMenu />
+          </>
+        }
       />
       <input
         ref={fileInputRef}
@@ -91,6 +96,8 @@ export default function App() {
       <div className="body">
         <Workspace onOpenFile={handleOpen} onPick={() => fileInputRef.current?.click()} />
       </div>
+
+      <AuthModal />
     </div>
   )
 }

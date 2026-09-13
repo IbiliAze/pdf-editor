@@ -647,3 +647,297 @@ body {
     font-size: 17px;
   }
 }
+
+/* ---------- modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 12px 48px rgba(15, 23, 42, 0.3);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 0;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.modal-close {
+  border: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.modal-close:hover {
+  background: #f1f2f6;
+}
+
+.modal-body {
+  padding: 14px 18px 18px;
+}
+
+.modal-foot {
+  padding: 0 18px 18px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-lead {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4b5563;
+  background: #f6f7fb;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* ---------- forms ---------- */
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.auth-form input {
+  font: inherit;
+  font-weight: 400;
+  padding: 9px 10px;
+  border: 1px solid #d8dae3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.auth-form input:focus {
+  outline: 2px solid #ffa800;
+  outline-offset: -1px;
+  border-color: #ffa800;
+}
+
+.hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.auth-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.auth-sent p {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.auth-switch {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #edeef3;
+}
+
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: #b45309;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn.block {
+  width: 100%;
+  justify-content: center;
+  padding: 10px;
+}
+
+/* ---------- account menu ---------- */
+
+.account {
+  position: relative;
+}
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 210px;
+}
+
+.account-btn.warn {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffa800;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.account-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 300px;
+  background: #fff;
+  border: 1px solid #e3e5ec;
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
+  padding: 12px;
+  z-index: 50;
+}
+
+.account-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #edeef3;
+  font-size: 12.5px;
+}
+
+.account-head .linkish {
+  align-self: flex-start;
+  color: #b45309;
+}
+
+.account-downloads {
+  padding: 10px 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.account-downloads h4 {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8891a0;
+}
+
+.account-downloads ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-downloads li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+}
+
+.dl-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- standalone pages (verify, reset) ---------- */
+
+.standalone {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+}
+
+.standalone-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 28px rgba(15, 23, 42, 0.12);
+  padding: 26px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.standalone-card h1 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+.standalone-card p {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.standalone-card .btn.primary {
+  display: inline-block;
+  text-decoration: none;
+}

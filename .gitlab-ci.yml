@@ -1,14 +1,14 @@
 stages:
+  - test
   - build
   - deploy
 
-build:
-  stage: build
+default:
   tags:
     - app-primary
-  only:
-    - main
-  script:
+
+.node: &node
+  before_script:
     - |
       if ! command -v npm >/dev/null 2>&1; then
         sudo apt-get update
@@ -18,6 +18,38 @@ build:
       fi
     - node --version
     - npm --version
+
+test:app:
+  <<: *node
+  stage: test
+  only:
+    - main
+    - merge_requests
+  script:
+    - npm ci
+    - npm run lint
+    - npm test
+
+test:api:
+  <<: *node
+  stage: test
+  only:
+    - main
+    - merge_requests
+  script:
+    - cd server
+    - npm ci
+    - npm run typecheck
+    - npm test
+
+build:
+  <<: *node
+  stage: build
+  only:
+    - main
+  needs:
+    - test:app
+  script:
     - npm ci
     - npm run build
   artifacts:
@@ -27,17 +59,24 @@ build:
 
 deploy:
   stage: deploy
-  tags:
-    - app-primary
   only:
     - main
   needs:
     - job: build
       artifacts: true
+    - job: test:api
   script:
-    - sudo mkdir -p /opt/pdf-editor/dist
+    # Static app.
+    - sudo mkdir -p /opt/pdf-editor/dist /opt/pdf-editor/data
     - sudo cp -a dist/. /opt/pdf-editor/dist/
-    - docker stack deploy -c docker-compose.yml pdf-editor
+    - sudo cp nginx/default.conf /opt/pdf-editor/nginx.conf
+    # The API image is built here because the service is pinned to this node.
+    - docker build -t pdf-editor-api:$CI_COMMIT_SHORT_SHA server/
+    - docker tag pdf-editor-api:$CI_COMMIT_SHORT_SHA pdf-editor-api:latest
+    # api.env holds the SMTP credentials and is managed by hand on the manager.
+    - test -f /opt/pdf-editor/api.env || (echo "missing /opt/pdf-editor/api.env - see server/api.env.example" && exit 1)
+    - sudo chown -R 1000:1000 /opt/pdf-editor/data
+    - API_IMAGE_TAG=$CI_COMMIT_SHORT_SHA docker stack deploy -c docker-compose.yml pdf-editor
     - sudo cp pdf-editor.conf /opt/stacks/proxy/conf.d/
     - docker exec $(docker ps -q -f name=proxy_nginx) nginx -t
     - docker exec $(docker ps -q -f name=proxy_nginx) nginx -s reload

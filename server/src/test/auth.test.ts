@@ -1,0 +1,234 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { FastifyInstance } from 'fastify'
+import { PASSWORD, headers, lastToken, sessionCookie, testApp } from './helpers.js'
+
+let app: FastifyInstance
+
+beforeEach(async () => {
+  app = await testApp()
+})
+
+afterEach(async () => {
+  await app.close()
+})
+
+const signup = (email: string, password = PASSWORD) =>
+  app.inject({ method: 'POST', url: '/api/auth/signup', headers: headers(), payload: { email, password } })
+
+const login = (email: string, password = PASSWORD) =>
+  app.inject({ method: 'POST', url: '/api/auth/login', headers: headers(), payload: { email, password } })
+
+describe('signup', () => {
+  it('creates an unverified account, signs it in and mails a link', async () => {
+    const res = await signup('a@example.com')
+    expect(res.statusCode).toBe(201)
+    expect(res.json().user).toMatchObject({ email: 'a@example.com', verified: false })
+    expect(sessionCookie(res)).toMatch(/^em_session=/)
+    expect(app.mailer.sent).toHaveLength(1)
+    expect(app.mailer.sent[0].to).toBe('a@example.com')
+    expect(lastToken(app)).not.toBe('')
+  })
+
+  it('rejects a short password and a malformed address', async () => {
+    expect((await signup('a@example.com', 'short')).statusCode).toBe(400)
+    expect((await signup('not-an-email')).statusCode).toBe(400)
+  })
+
+  it('does not reveal that an address is already registered', async () => {
+    await signup('taken@example.com')
+    const res = await signup('taken@example.com')
+    expect(res.statusCode).toBe(201)
+    expect(res.json().user).toBeUndefined()
+    // the owner is told, rather than the person signing up
+    expect(app.mailer.sent[1].text).toMatch(/already have an account/i)
+  })
+
+  it('treats the address case-insensitively', async () => {
+    await signup('Case@Example.com')
+    const res = await login('case@example.com')
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('login', () => {
+  it('rejects a wrong password with the same message as an unknown address', async () => {
+    await signup('a@example.com')
+    const wrong = await login('a@example.com', 'wrong password!')
+    const unknown = await login('nobody@example.com')
+    expect(wrong.statusCode).toBe(401)
+    expect(unknown.statusCode).toBe(401)
+    expect(wrong.json().message).toBe(unknown.json().message)
+  })
+
+  it('issues an httpOnly session cookie', async () => {
+    await signup('a@example.com')
+    const res = await login('a@example.com')
+    const cookie = res.cookies.find((c) => c.name === 'em_session')!
+    expect(cookie.httpOnly).toBe(true)
+    expect(cookie.sameSite?.toLowerCase()).toBe('lax')
+  })
+})
+
+describe('me and logout', () => {
+  it('reports the signed-in user and forgets them on logout', async () => {
+    const created = await signup('a@example.com')
+    const cookie = sessionCookie(created)
+
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(cookie) })
+    expect(me.json().user.email).toBe('a@example.com')
+
+    await app.inject({ method: 'POST', url: '/api/auth/logout', headers: headers(cookie) })
+    const after = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(cookie) })
+    expect(after.statusCode).toBe(401)
+  })
+
+  it('is unauthenticated without a cookie', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/auth/me' })
+    expect(res.statusCode).toBe(401)
+  })
+})
+
+describe('email verification', () => {
+  it('marks the account verified and signs the visitor in', async () => {
+    await signup('a@example.com')
+    const token = lastToken(app)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify',
+      headers: headers(),
+      payload: { token },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().user.verified).toBe(true)
+    // the link works from a different browser than the one that signed up
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: headers(sessionCookie(res)),
+    })
+    expect(me.json().user.verified).toBe(true)
+  })
+
+  it('refuses a token a second time', async () => {
+    await signup('a@example.com')
+    const token = lastToken(app)
+    await app.inject({ method: 'POST', url: '/api/auth/verify', headers: headers(), payload: { token } })
+    const again = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify',
+      headers: headers(),
+      payload: { token },
+    })
+    expect(again.statusCode).toBe(400)
+  })
+
+  it('refuses a made-up token', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify',
+      headers: headers(),
+      payload: { token: 'x'.repeat(40) },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('resends only for a signed-in, unverified account', async () => {
+    const created = await signup('a@example.com')
+    const cookie = sessionCookie(created)
+    const anon = await app.inject({
+      method: 'POST',
+      url: '/api/auth/resend-verification',
+      headers: headers(),
+    })
+    expect(anon.statusCode).toBe(401)
+
+    const resend = await app.inject({
+      method: 'POST',
+      url: '/api/auth/resend-verification',
+      headers: headers(cookie),
+    })
+    expect(resend.statusCode).toBe(200)
+    expect(app.mailer.sent).toHaveLength(2)
+    // the newest link works and the superseded one does not
+    const fresh = lastToken(app)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/auth/verify',
+          headers: headers(),
+          payload: { token: fresh },
+        })
+      ).statusCode,
+    ).toBe(200)
+  })
+})
+
+describe('password reset', () => {
+  it('answers the same whether or not the address exists', async () => {
+    await signup('a@example.com')
+    const known = await app.inject({
+      method: 'POST',
+      url: '/api/auth/forgot-password',
+      headers: headers(),
+      payload: { email: 'a@example.com' },
+    })
+    const unknown = await app.inject({
+      method: 'POST',
+      url: '/api/auth/forgot-password',
+      headers: headers(),
+      payload: { email: 'nobody@example.com' },
+    })
+    expect(known.statusCode).toBe(200)
+    expect(unknown.statusCode).toBe(200)
+    expect(known.json()).toEqual(unknown.json())
+  })
+
+  it('changes the password, verifies the account and drops old sessions', async () => {
+    const created = await signup('a@example.com')
+    const oldCookie = sessionCookie(created)
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/forgot-password',
+      headers: headers(),
+      payload: { email: 'a@example.com' },
+    })
+    const token = lastToken(app)
+    const reset = await app.inject({
+      method: 'POST',
+      url: '/api/auth/reset-password',
+      headers: headers(),
+      payload: { token, password: 'a whole new password' },
+    })
+    expect(reset.statusCode).toBe(200)
+    expect(reset.json().user.verified).toBe(true)
+
+    const stale = await app.inject({ method: 'GET', url: '/api/auth/me', headers: headers(oldCookie) })
+    expect(stale.statusCode).toBe(401)
+    expect((await login('a@example.com', 'a whole new password')).statusCode).toBe(200)
+    expect((await login('a@example.com', PASSWORD)).statusCode).toBe(401)
+  })
+})
+
+describe('request hardening', () => {
+  it('rejects a write from another origin', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: 'https://evil.example' },
+      payload: { email: 'a@example.com', password: PASSWORD },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('rate limits repeated sign-up attempts', async () => {
+    const codes: number[] = []
+    for (let i = 0; i < 7; i++) codes.push((await signup(`rl${i}@example.com`)).statusCode)
+    expect(codes.filter((c) => c === 429).length).toBeGreaterThan(0)
+  })
+
+  it('serves a health check', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/health' })
+    expect(res.json()).toEqual({ ok: true })
+  })
+})

@@ -1,3 +1,8 @@
 node_modules
 dist
 .DS_Store
+server/dist
+server/*.db
+server/*.db-wal
+server/*.db-shm
+*.local

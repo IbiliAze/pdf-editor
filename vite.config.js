@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // The API runs as its own container in production, behind the same origin.
+    proxy: { '/api': process.env.API_PROXY_TARGET || 'http://localhost:3000' },
+  },
   build: {
     rollupOptions: {
       output: {

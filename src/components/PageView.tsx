@@ -1,63 +1,75 @@
-import { useEffect, useRef } from 'react'
-import type { PDFDocumentProxy } from '../lib/pdfjs'
-import { normRect } from '../lib/utils'
-import ElementView from './ElementView'
-import LineEditor from './LineEditor'
-import type {
-  EditingSession,
-  EditorElement,
-  Line,
-  LiveDraw,
-  PageHandlers,
-  PageInfo,
-  ToolId,
-} from '../types'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useStore } from '../store'
+import { usePageElements } from '../store/selectors'
+import { toolById } from '../features/registry'
+import { kindOf } from '../features/registry'
+import { pagePointerDown, pagePointerMove, pagePointerUp } from '../actions/interaction'
+import { beginMove, beginResize } from '../hooks/useDragInteraction'
+import {
+  BlockEditor,
+  LineEditor,
+  blockEditForLine,
+  startBlockEdit,
+  startLineEdit,
+} from '../features/text-edit'
+import { frameBoxStyle } from '../features/text-edit/frame'
+import { totalRotation } from '../types'
+import ElementLayer from './ElementLayer'
+import type { EditorElement, ElementEvents, Line, Page } from '../types'
 
-interface PageViewProps {
-  page: PageInfo
-  doc: PDFDocumentProxy | null
-  zoom: number
-  tool: ToolId
-  elements: EditorElement[]
-  linesById: Record<string, Line>
-  selectedId: number | null
-  editing: EditingSession | null
-  editingElId: number | null
-  liveDraw: LiveDraw | null
-  on: PageHandlers
+interface Props {
+  page: Page
+  index: number
 }
 
-/**
- * One PDF page: the rendered canvas plus the interaction overlay with all
- * editor elements, line hit targets, and the inline line editor.
- */
-export default function PageView({
-  page,
-  doc,
-  zoom,
-  tool,
-  elements,
-  linesById,
-  selectedId,
-  editing,
-  editingElId,
-  liveDraw,
-  on,
-}: PageViewProps) {
+/** One page: the rendered canvas plus the interaction overlay. */
+export default function PageView({ page, index }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const genRef = useRef(0)
+  const shellRef = useRef<HTMLDivElement>(null)
 
-  // Render the page into an offscreen canvas at the current zoom, then blit,
-  // so re-renders never show a blank page. `gen` discards stale renders.
+  const zoom = useStore((s) => s.zoom)
+  const tool = useStore((s) => s.tool)
+  const session = useStore((s) => s.session)
+  const liveDraw = useStore((s) => s.liveDraw)
+  const marquee = useStore((s) => s.marquee)
+  const activePageId = useStore((s) => s.activePageId)
+  const sources = useStore((s) => s.sources)
+  const pageText = useStore((s) => s.pageText[page.id])
+  const ensurePageText = useStore((s) => s.ensurePageText)
+  const elements = usePageElements(page.id)
+
+  const behaviour = toolById(tool)?.behaviour
+  const w = page.width * zoom
+  const h = page.height * zoom
+
+  // Render the page into an offscreen canvas at the current zoom, then blit, so
+  // re-renders never show a blank page. `gen` discards superseded renders.
   useEffect(() => {
+    const src = page.source
+    if (src.kind !== 'pdf') {
+      const canvas = canvasRef.current
+      if (canvas) {
+        const dpr = window.devicePixelRatio || 1
+        canvas.width = Math.floor(page.width * zoom * dpr)
+        canvas.height = Math.floor(page.height * zoom * dpr)
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+        }
+      }
+      return
+    }
+    const doc = sources[src.docId]?.pdfjs
     if (!doc) return
     const gen = ++genRef.current
     let cancelled = false
     ;(async () => {
       try {
-        const p = await doc.getPage(page.pageIndex + 1)
+        const p = await doc.getPage(src.pageIndex + 1)
         const dpr = window.devicePixelRatio || 1
-        const vp = p.getViewport({ scale: zoom * dpr })
+        const vp = p.getViewport({ scale: zoom * dpr, rotation: totalRotation(page) })
         const off = document.createElement('canvas')
         off.width = Math.floor(vp.width)
         off.height = Math.floor(vp.height)
@@ -77,104 +89,260 @@ export default function PageView({
     return () => {
       cancelled = true
     }
-  }, [doc, page.pageIndex, zoom])
+  }, [sources, page, zoom])
 
-  const pageElements = elements.filter((el) => el.pageIndex === page.pageIndex)
-  const editedLineIds = new Set(
-    pageElements.filter((el) => el.type === 'edit').map((el) => (el.type === 'edit' ? el.lineId : '')),
+  // Extract text the first time the page scrolls into view.
+  useEffect(() => {
+    const el = shellRef.current
+    if (!el || pageText) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          ensurePageText(page.id)
+          io.disconnect()
+        }
+      },
+      { rootMargin: '400px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [page.id, pageText, ensurePageText])
+
+  const events: ElementEvents = useMemo(
+    () => ({
+      pointerDown: (e, el) => {
+        const s = useStore.getState()
+        if (s.tool === 'edittext' || s.tool === 'editpara') {
+          if (el.type === 'edit') {
+            // preventDefault stops the browser's focus-change default action,
+            // which would otherwise blur (and instantly close) the editor.
+            e.preventDefault()
+            e.stopPropagation()
+            const line = s.pageText[el.pageId]?.lines.find(
+              (l) => l.id === (el as { lineId: string }).lineId,
+            )
+            if (line) startLineEdit(line, canvasRef.current, page.width)
+          } else if (el.type === 'blockedit') {
+            e.preventDefault()
+            e.stopPropagation()
+            openBlock(el, page, canvasRef.current)
+          }
+          return
+        }
+        if (s.tool !== 'select') return
+        e.stopPropagation()
+        const additive = e.shiftKey || e.metaKey || e.ctrlKey
+        const ids = additive
+          ? s.selectedIds.includes(el.id)
+            ? s.selectedIds.filter((id) => id !== el.id)
+            : [...s.selectedIds, el.id]
+          : s.selectedIds.includes(el.id)
+            ? s.selectedIds
+            : [el.id]
+        s.setSelection(ids)
+        if (kindOf(el)?.pinned) return
+        beginMove(e, ids.filter((id) => !kindOf(s.elements.find((x) => x.id === id)!)?.pinned))
+      },
+      doubleClick: (_e, el) => {
+        const s = useStore.getState()
+        if (el.type === 'text') {
+          s.setSelection([el.id])
+          s.setSession({ kind: 'element', id: el.id })
+        }
+      },
+      resizePointerDown: (e, el, handle) => {
+        e.stopPropagation()
+        useStore.getState().setSelection([el.id])
+        beginResize(e, el, handle)
+      },
+      textChange: (id, text) => {
+        useStore
+          .getState()
+          .updateElement(id, (el) => ({ ...el, text }) as EditorElement, true)
+      },
+      finishTextEdit: (id) => {
+        const s = useStore.getState()
+        s.setSession(null)
+        const el = s.elements.find((e) => e.id === id) as (EditorElement & { text?: string }) | undefined
+        if (el && el.type === 'text' && !el.text?.trim()) s.removeElements([id])
+      },
+    }),
+    [page],
   )
-  const editingLine =
-    editing && editing.pageIndex === page.pageIndex ? linesById[editing.lineId] : null
-  const w = page.width * zoom
-  const h = page.height * zoom
 
-  const live = liveDraw && liveDraw.pageIndex === page.pageIndex ? liveDraw : null
-  const liveRect = live && live.type !== 'path' ? normRect(live) : null
+  const onLineClick = useCallback(
+    (line: Line) => {
+      const s = useStore.getState()
+      if (s.tool === 'editpara' && line.blockId) {
+        const block = s.pageText[page.id]?.blocks.find((b) => b.id === line.blockId)
+        const lines = s.pageText[page.id]?.lines ?? []
+        if (block) {
+          startBlockEdit(
+            block,
+            block.lineIds.map((id) => lines.find((l) => l.id === id)!).filter(Boolean),
+            canvasRef.current,
+            page.width,
+          )
+          return
+        }
+      }
+      startLineEdit(line, canvasRef.current, page.width)
+    },
+    [page],
+  )
+
+  const editedLineIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const el of elements) {
+      if (el.type === 'edit') set.add((el as { lineId: string }).lineId)
+      if (el.type === 'blockedit') {
+        const block = pageText?.blocks.find((b) => b.id === (el as { blockId: string }).blockId)
+        for (const id of block?.lineIds ?? []) set.add(id)
+      }
+    }
+    return set
+  }, [elements, pageText])
+
+  const showHits = behaviour?.showLineHits
+  const editingLine =
+    session?.kind === 'line' ? pageText?.lines.find((l) => l.id === session.lineId) : undefined
+  const editingBlock =
+    session?.kind === 'block' ? pageText?.blocks.find((b) => b.id === session.blockId) : undefined
+
+  const live = liveDraw && liveDraw.pageId === page.id ? liveDraw : null
 
   return (
-    <div className="page-shell">
-      <div className="page-label">Page {page.pageIndex + 1}</div>
+    <div className="page-shell" ref={shellRef} data-page-id={page.id}>
+      <div className="page-label">Page {index + 1}</div>
       <div className="page-wrap" style={{ width: w, height: h }}>
         <canvas ref={canvasRef} style={{ width: w, height: h }} />
         <div
           className={`overlay tool-${tool}`}
-          onPointerDown={(e) => on.pagePointerDown(e, page)}
-          onPointerMove={(e) => on.pagePointerMove(e, page)}
-          onPointerUp={() => on.pagePointerUp()}
-          onPointerLeave={() => on.pagePointerLeave()}
+          style={behaviour?.cursor ? { cursor: behaviour.cursor } : undefined}
+          onPointerDown={(e) => pagePointerDown(e, page, canvasRef.current)}
+          onPointerMove={(e) => pagePointerMove(e, page, canvasRef.current)}
+          onPointerUp={(e) => pagePointerUp(e, page, canvasRef.current)}
+          onPointerLeave={(e) => pagePointerUp(e, page, canvasRef.current)}
         >
-          {pageElements.map((el) => (
-            <ElementView
-              key={el.id}
-              el={el}
-              zoom={zoom}
-              tool={tool}
-              pageW={w}
-              pageH={h}
-              isSelected={el.id === selectedId}
-              editingElId={editingElId}
-              editingLineId={editing?.lineId ?? null}
-              linesById={linesById}
-              on={on}
-            />
-          ))}
+          <ElementLayer page={page} elements={elements} events={events} />
 
-          {live && live.type === 'path' && (
-            <svg className="draw-layer" width={w} height={h}>
-              <polyline
-                points={live.points.map((p) => `${p.x * zoom},${p.y * zoom}`).join(' ')}
-                fill="none"
-                stroke={live.color}
-                strokeWidth={Math.max(1, live.width * zoom)}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-          {live && liveRect && (
+          {live && <LivePreview el={live} page={page} zoom={zoom} />}
+
+          {marquee && activePageId === page.id && (
             <div
-              className={`el-${live.type} live`}
+              className="marquee"
               style={{
-                left: liveRect.x * zoom,
-                top: liveRect.y * zoom,
-                width: liveRect.w * zoom,
-                height: liveRect.h * zoom,
-                ...(live.type === 'highlight' ? { background: live.color } : {}),
+                left: marquee.x * zoom,
+                top: marquee.y * zoom,
+                width: marquee.w * zoom,
+                height: marquee.h * zoom,
               }}
             />
           )}
 
-          {tool === 'edittext' &&
-            page.lines.map((line) =>
-              editedLineIds.has(line.id) || editing?.lineId === line.id ? null : (
-                <div
+          {showHits &&
+            (pageText?.lines ?? []).map((line) =>
+              editedLineIds.has(line.id) || session?.kind === 'line' ? null : (
+                <LineHit
                   key={line.id}
-                  className="line-hit"
-                  title="Click to edit this text"
-                  style={{
-                    left: (line.x - 2) * zoom,
-                    top: (line.top - 2) * zoom,
-                    width: (line.width + 4) * zoom,
-                    height: (line.height + 4) * zoom,
-                  }}
-                  onPointerDown={(e) => {
-                    // preventDefault stops the browser's focus-change default
-                    // action, which would otherwise blur (and instantly close)
-                    // the editor input mounted by this tap/click.
-                    e.preventDefault()
-                    e.stopPropagation()
-                    on.lineClick(line, canvasRef.current, page)
-                  }}
-                  onMouseDown={(e) => e.preventDefault()}
+                  line={line}
+                  zoom={zoom}
+                  mode={showHits}
+                  onActivate={onLineClick}
                 />
               ),
             )}
 
-          {editingLine && editing && (
-            <LineEditor editing={editing} line={editingLine} zoom={zoom} on={on} />
+          {editingLine && session?.kind === 'line' && (
+            <LineEditor session={session} line={editingLine} zoom={zoom} />
+          )}
+          {editingBlock && session?.kind === 'block' && (
+            <BlockEditor
+              session={session}
+              block={editingBlock}
+              firstLine={pageText?.lines.find((l) => l.id === editingBlock.lineIds[0])}
+              zoom={zoom}
+            />
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function openBlock(el: EditorElement, page: Page, canvas: HTMLCanvasElement | null): void {
+  const s = useStore.getState()
+  const blockId = (el as { blockId: string }).blockId
+  const block = s.pageText[page.id]?.blocks.find((b) => b.id === blockId)
+  if (!block) return
+  const lines = s.pageText[page.id]?.lines ?? []
+  startBlockEdit(
+    block,
+    block.lineIds.map((id) => lines.find((l) => l.id === id)!).filter(Boolean),
+    canvas,
+    page.width,
+  )
+}
+
+const MIN_HIT = 9
+
+function LineHit({
+  line,
+  zoom,
+  mode,
+  onActivate,
+}: {
+  line: Line
+  zoom: number
+  mode: 'line' | 'block'
+  onActivate: (line: Line) => void
+}) {
+  if (mode === 'block' && !line.blockId) return null
+  if (blockEditForLine(line)) return null
+  const pad = 2
+  // Tiny runs still need a target a finger can hit.
+  const h = Math.max(line.height + pad * 2, MIN_HIT / zoom)
+  const vTop = line.top + line.height / 2 - h / 2
+  return (
+    <div
+      className={`line-hit${mode === 'block' ? ' block-hit' : ''}`}
+      title={mode === 'block' ? 'Click to edit this paragraph' : 'Click to edit this text'}
+      style={frameBoxStyle(line, line.x - pad, vTop, zoom, line.width + pad * 2, h)}
+      onPointerDown={(e) => {
+        // preventDefault stops the browser's focus-change default action, which
+        // would otherwise blur (and instantly close) the editor this opens.
+        e.preventDefault()
+        e.stopPropagation()
+        onActivate(line)
+      }}
+      onMouseDown={(e) => e.preventDefault()}
+    />
+  )
+}
+
+function LivePreview({ el, page, zoom }: { el: EditorElement; page: Page; zoom: number }) {
+  const kind = kindOf(el)
+  if (!kind) return null
+  return (
+    <div className="live-preview">
+      {kind.render(el, {
+        zoom,
+        tool: 'select',
+        page,
+        selected: false,
+        editing: false,
+        linesById: {},
+        blocksById: {},
+        hiddenLineId: null,
+        hiddenBlockId: null,
+        on: {
+          pointerDown: () => {},
+          doubleClick: () => {},
+          resizePointerDown: () => {},
+          textChange: () => {},
+          finishTextEdit: () => {},
+        },
+      })}
     </div>
   )
 }

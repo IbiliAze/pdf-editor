@@ -1,4 +1,25 @@
 /* Embeddable font families (same TTFs are subset into exported PDFs). */
+@font-face { font-family: 'Arimo'; src: url('/fonts/arimo-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Arimo'; src: url('/fonts/arimo-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Arimo'; src: url('/fonts/arimo-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Arimo'; src: url('/fonts/arimo-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Tinos'; src: url('/fonts/tinos-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Tinos'; src: url('/fonts/tinos-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Tinos'; src: url('/fonts/tinos-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Tinos'; src: url('/fonts/tinos-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Cousine'; src: url('/fonts/cousine-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cousine'; src: url('/fonts/cousine-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cousine'; src: url('/fonts/cousine-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Cousine'; src: url('/fonts/cousine-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Carlito'; src: url('/fonts/carlito-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Carlito'; src: url('/fonts/carlito-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Carlito'; src: url('/fonts/carlito-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Carlito'; src: url('/fonts/carlito-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Caladea'; src: url('/fonts/caladea-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Caladea'; src: url('/fonts/caladea-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Caladea'; src: url('/fonts/caladea-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Caladea'; src: url('/fonts/caladea-bolditalic.ttf'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Great Vibes'; src: url('/fonts/greatvibes-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('/fonts/roboto-regular.ttf'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('/fonts/roboto-bold.ttf'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('/fonts/roboto-italic.ttf'); font-weight: 400; font-style: italic; font-display: swap; }
@@ -239,6 +260,13 @@ body {
 
 /* ---------- workspace ---------- */
 
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
 .workspace {
   flex: 1;
   overflow: auto;
@@ -331,7 +359,8 @@ body {
   user-select: none;
 }
 
-.overlay.tool-edittext { cursor: default; }
+.overlay.tool-edittext,
+.overlay.tool-editpara { cursor: default; }
 .overlay.tool-text { cursor: text; }
 .overlay.tool-whiteout,
 .overlay.tool-highlight,
@@ -349,6 +378,8 @@ body {
 .tool-select .text-el,
 .tool-select .el-whiteout,
 .tool-select .el-highlight,
+.tool-select .el-shape,
+.tool-select .el-image,
 .resize-handle {
   touch-action: none;
 }
@@ -435,6 +466,8 @@ body {
 .tool-select .text-el,
 .tool-select .el-whiteout,
 .tool-select .el-highlight,
+.tool-select .el-shape,
+.tool-select .el-image,
 .tool-select .edit-cover {
   cursor: move;
 }
@@ -466,16 +499,69 @@ body {
 
 .resize-handle {
   position: absolute;
-  right: -5px;
-  top: 50%;
-  margin-top: -5px;
   width: 10px;
   height: 10px;
+  margin: -5px 0 0 -5px;
   border-radius: 50%;
   background: #ffa800;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
-  cursor: ew-resize;
+  z-index: 12;
+}
+
+.handle-nw { cursor: nwse-resize; }
+.handle-n  { cursor: ns-resize; }
+.handle-ne { cursor: nesw-resize; }
+.handle-e  { cursor: ew-resize; }
+.handle-se { cursor: nwse-resize; }
+.handle-s  { cursor: ns-resize; }
+.handle-sw { cursor: nesw-resize; }
+.handle-w  { cursor: ew-resize; }
+
+/* ---------- paragraph editing ---------- */
+
+.block-hit:hover {
+  outline: 1.5px solid rgba(37, 99, 235, 0.75);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.block-cover {
+  overflow: visible;
+}
+
+.tool-editpara .block-cover:hover {
+  outline: 1.5px dashed rgba(37, 99, 235, 0.75);
+}
+
+.block-editor {
+  border: 1.5px solid #2563eb;
+  border-radius: 2px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.2);
+  z-index: 10;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ---------- marquee selection ---------- */
+
+.marquee {
+  border: 1px dashed #4f46e5;
+  background: rgba(79, 70, 229, 0.1);
+  pointer-events: none;
+  z-index: 11;
+}
+
+.live-preview {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.live-preview > * {
+  position: absolute;
 }
 
 /* ---------- responsive ---------- */
@@ -540,7 +626,14 @@ body {
     font-size: 11px;
   }
 
-  .workspace {
+  .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.workspace {
     padding: 12px 8px;
     gap: 18px;
   }

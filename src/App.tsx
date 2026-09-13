@@ -1,623 +1,77 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import './features'
 import Toolbar from './components/Toolbar'
-import PageView from './components/PageView'
-import { useElements } from './hooks/useElements'
-import { usePdfDocument } from './hooks/usePdfDocument'
-import { buildEditedPdf } from './lib/exportPdf'
-import { sampleLineColors } from './lib/textLayer'
-import { downloadBytes, nid, normRect } from './lib/utils'
+import Workspace from './components/Workspace'
+import { useStore } from './store'
+import { useDragInteraction } from './hooks/useDragInteraction'
+import { useKeyboard } from './hooks/useKeyboard'
+import { toolById } from './features/registry'
+import { downloadPdf } from './actions/exportPdf'
 import { clamp } from './lib/colors'
-import { HIGHLIGHT_COLOR, TOOLS, ZOOM_LEVELS } from './constants'
-import type {
-  EditElement,
-  EditingSession,
-  EditorElement,
-  Line,
-  LiveDraw,
-  PageHandlers,
-  PageInfo,
-  Status,
-  TextElement,
-  TextStyle,
-  ToolId,
-} from './types'
-
-interface DragState {
-  mode: 'move' | 'resize'
-  id: number
-  startX: number
-  startY: number
-  base: EditorElement[]
-  baseW?: number
-  moved: boolean
-}
 
 export default function App() {
-  const pdf = usePdfDocument()
-  const els = useElements()
-
-  const [tool, setToolState] = useState<ToolId>('edittext')
-  const [zoom, setZoom] = useState(1.25)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [editing, setEditingState] = useState<EditingSession | null>(null)
-  const [editingElId, setEditingElId] = useState<number | null>(null)
-  const [liveDraw, setLiveDrawState] = useState<LiveDraw | null>(null)
-  const [status, setStatus] = useState<Status | null>(null)
-  const [textStyle, setTextStyle] = useState<TextStyle>({
-    family: 'Helvetica',
-    bold: false,
-    italic: false,
-    size: 16,
-    color: '#111827',
-  })
-
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const editingRef = useRef<EditingSession | null>(null)
-  const liveDrawRef = useRef<LiveDraw | null>(null)
-  const dragRef = useRef<DragState | null>(null)
+  const openFile = useStore((s) => s.openFile)
+  const status = useStore((s) => s.status)
+  const setStatus = useStore((s) => s.setStatus)
+  const loading = useStore((s) => s.loading)
+  const tool = useStore((s) => s.tool)
+  const pages = useStore((s) => s.pages)
+  const fileName = useStore((s) => s.fileName)
+  const elementCount = useStore((s) => s.elements.length)
 
-  const linesById = useMemo(() => {
-    const map: Record<string, Line> = {}
-    for (const p of pdf.pages) for (const l of p.lines) map[l.id] = l
-    return map
-  }, [pdf.pages])
+  useDragInteraction()
 
-  // Sessions live in state for rendering and in refs so event handlers
-  // (blur commits, drags) always see the current value synchronously.
-  const setEditing = useCallback((v: EditingSession | null) => {
-    editingRef.current = v
-    setEditingState(v)
-  }, [])
-
-  const setLiveDraw = useCallback((v: LiveDraw | null) => {
-    liveDrawRef.current = v
-    setLiveDrawState(v)
-  }, [])
-
-  // ---- open / load ----
-
-  const openFile = useCallback(
+  const handleOpen = useCallback(
     async (file: File | null | undefined) => {
       if (!file) return
       setStatus(null)
       try {
-        const pages = await pdf.open(file)
-        els.reset()
-        setSelectedId(null)
-        setEditing(null)
-        setEditingElId(null)
-        setLiveDraw(null)
-        setToolState('edittext')
+        await openFile(file)
         // Fit the page to the viewport on small screens; cap at the
         // comfortable desktop default.
-        const first = pages[0]
+        const first = useStore.getState().pages[0]
         if (first) {
           const avail = document.documentElement.clientWidth - 24
-          setZoom(clamp(Math.min(1.25, avail / first.width), 0.4, 1.25))
+          useStore.setState({ zoom: clamp(Math.min(1.25, avail / first.width), 0.4, 1.25) })
         }
       } catch (err) {
         setStatus({ type: 'error', msg: `Could not open PDF: ${(err as Error)?.message ?? err}` })
       }
     },
-    [pdf, els, setEditing, setLiveDraw],
+    [openFile, setStatus],
   )
 
-  // ---- native text editing ----
-
-  const commitLineEdit = useCallback(() => {
-    const s = editingRef.current
-    if (!s) return
-    setEditing(null)
-    const line = linesById[s.lineId]
-    if (!line) return
-    const fontDirty =
-      s.font.family !== line.font.family ||
-      s.font.bold !== line.font.bold ||
-      s.font.italic !== line.font.italic
-    const sizeDirty = Math.abs(s.size - line.fontHeight) > 0.01
-    const dirty = s.text !== line.text || fontDirty || sizeDirty || s.color !== s.baseColor
-    const existing = els.elementsRef.current.find(
-      (el): el is EditElement => el.type === 'edit' && el.lineId === s.lineId,
-    )
-    const id = existing?.id ?? nid()
-    els.commit((prev) => {
-      const others = prev.filter((el) => !(el.type === 'edit' && el.lineId === s.lineId))
-      if (!dirty) return others.length === prev.length ? prev : others
-      const edit: EditElement = {
-        id,
-        type: 'edit',
-        lineId: s.lineId,
-        pageIndex: s.pageIndex,
-        text: s.text,
-        bg: s.bg,
-        color: s.color,
-        baseColor: s.baseColor,
-      }
-      if (fontDirty) edit.font = s.font
-      if (sizeDirty) edit.size = s.size
-      return [...others, edit]
-    })
-    // Keep the committed edit selected so toolbar style controls (which blur
-    // and thereby close the inline editor) still have a target to apply to.
-    setSelectedId(dirty ? id : null)
-  }, [linesById, els, setEditing])
-
-  const startLineEdit = useCallback(
-    (line: Line, canvas: HTMLCanvasElement | null, page: PageInfo | null) => {
-      if (editingRef.current) commitLineEdit()
-      const existing = els.elementsRef.current.find(
-        (el): el is EditElement => el.type === 'edit' && el.lineId === line.id,
-      )
-      let bg = '#ffffff'
-      let color = '#111827'
-      let baseColor = '#111827'
-      if (existing) {
-        bg = existing.bg
-        color = existing.color
-        baseColor = existing.baseColor ?? existing.color
-      } else if (canvas && page) {
-        const sampled = sampleLineColors(canvas, line, canvas.width / page.width)
-        bg = sampled.bg
-        color = sampled.color
-        baseColor = sampled.color
-      }
-      setEditing({
-        lineId: line.id,
-        pageIndex: line.pageIndex,
-        text: existing ? existing.text : line.text,
-        bg,
-        color,
-        baseColor,
-        font: existing?.font ?? line.font,
-        size: existing?.size ?? line.fontHeight,
-      })
-      setSelectedId(null)
-    },
-    [commitLineEdit, els, setEditing],
-  )
-
-  // ---- added elements ----
-
-  const addTextAt = useCallback(
-    (page: PageInfo, pt: { x: number; y: number }) => {
-      const el: TextElement = {
-        id: nid(),
-        type: 'text',
-        pageIndex: page.pageIndex,
-        x: pt.x,
-        y: pt.y,
-        w: 240,
-        text: '',
-        size: textStyle.size,
-        color: textStyle.color,
-        font: { family: textStyle.family, bold: textStyle.bold, italic: textStyle.italic },
-      }
-      els.commit((prev) => [...prev, el])
-      setSelectedId(el.id)
-      setEditingElId(el.id)
-    },
-    [els, textStyle],
-  )
-
-  const finishElementEdit = useCallback(
-    (id: number) => {
-      setEditingElId(null)
-      const el = els.elementsRef.current.find((e) => e.id === id)
-      if (el && el.type === 'text' && !el.text.trim()) {
-        els.setElementsNow(els.elementsRef.current.filter((e) => e.id !== id))
-        setSelectedId(null)
-      }
-    },
-    [els],
-  )
-
-  const deleteSelected = useCallback(() => {
-    if (selectedId == null) return
-    els.commit((prev) => prev.filter((el) => el.id !== selectedId))
-    setSelectedId(null)
-  }, [selectedId, els])
-
-  // ---- page pointer handlers ----
-
-  const localPoint = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      const r = e.currentTarget.getBoundingClientRect()
-      return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }
-    },
-    [zoom],
-  )
-
-  const onPagePointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => {
-      if (editingRef.current) {
-        commitLineEdit()
-        return
-      }
-      if (tool === 'text') {
-        addTextAt(page, localPoint(e))
-        e.preventDefault()
-        return
-      }
-      if (tool === 'whiteout' || tool === 'highlight') {
-        const pt = localPoint(e)
-        setLiveDraw(
-          tool === 'highlight'
-            ? { id: nid(), type: 'highlight', pageIndex: page.pageIndex, x: pt.x, y: pt.y, w: 0, h: 0, color: HIGHLIGHT_COLOR }
-            : { id: nid(), type: 'whiteout', pageIndex: page.pageIndex, x: pt.x, y: pt.y, w: 0, h: 0 },
-        )
-        return
-      }
-      if (tool === 'pen') {
-        const pt = localPoint(e)
-        setLiveDraw({
-          id: nid(),
-          type: 'path',
-          pageIndex: page.pageIndex,
-          points: [pt],
-          color: textStyle.color,
-          width: 2,
-        })
-        return
-      }
-      if (tool === 'select') setSelectedId(null)
-    },
-    [tool, addTextAt, localPoint, commitLineEdit, setLiveDraw, textStyle.color],
-  )
-
-  const onPagePointerMove = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>, page: PageInfo) => {
-      const d = liveDrawRef.current
-      if (!d || d.pageIndex !== page.pageIndex) return
-      const pt = localPoint(e)
-      if (d.type === 'path') setLiveDraw({ ...d, points: [...d.points, pt] })
-      else setLiveDraw({ ...d, w: pt.x - d.x, h: pt.y - d.y })
-    },
-    [localPoint, setLiveDraw],
-  )
-
-  const commitLiveDraw = useCallback(() => {
-    const d = liveDrawRef.current
-    if (!d) return
-    setLiveDraw(null)
-    if (d.type === 'path') {
-      if (d.points.length > 1) els.commit((prev) => [...prev, d])
-      return
+  const handleExport = useCallback(async () => {
+    if (!useStore.getState().pages.length) return
+    setStatus({ type: 'info', msg: 'Preparing PDF…' })
+    try {
+      const result = await downloadPdf()
+      setStatus({ type: 'success', msg: `Downloaded ${result.fileName}.` })
+    } catch (err) {
+      setStatus({ type: 'error', msg: `Export failed: ${(err as Error)?.message ?? err}` })
     }
-    const r = normRect(d)
-    if (r.w > 2 && r.h > 2) els.commit((prev) => [...prev, r])
-  }, [els, setLiveDraw])
+  }, [setStatus])
 
-  const onElementPointerDown = useCallback(
-    (e: ReactPointerEvent, el: EditorElement) => {
-      if (tool === 'edittext') {
-        if (el.type === 'edit') {
-          // preventDefault stops the browser's focus-change default action,
-          // which would otherwise blur (and instantly close) the editor.
-          e.preventDefault()
-          e.stopPropagation()
-          const line = linesById[el.lineId]
-          if (line) startLineEdit(line, null, null)
-        }
-        return
-      }
-      if (tool !== 'select') return
-      e.stopPropagation()
-      setSelectedId(el.id)
-      if (el.type === 'edit') return // edits stay pinned to their original line
-      dragRef.current = {
-        mode: 'move',
-        id: el.id,
-        startX: e.clientX,
-        startY: e.clientY,
-        base: els.elementsRef.current,
-        moved: false,
-      }
-    },
-    [tool, linesById, startLineEdit, els],
-  )
-
-  const onResizePointerDown = useCallback(
-    (e: ReactPointerEvent, el: TextElement) => {
-      e.stopPropagation()
-      setSelectedId(el.id)
-      dragRef.current = {
-        mode: 'resize',
-        id: el.id,
-        startX: e.clientX,
-        startY: e.clientY,
-        base: els.elementsRef.current,
-        baseW: el.w,
-        moved: false,
-      }
-    },
-    [els],
-  )
-
-  // Window-level drag: move/resize the pressed element; history is pushed
-  // once, on the first actual movement.
-  useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      const d = dragRef.current
-      if (!d) return
-      if (!d.moved) {
-        if (Math.abs(e.clientX - d.startX) + Math.abs(e.clientY - d.startY) < 3) return
-        d.moved = true
-        els.pushHistory(d.base)
-      }
-      const dx = (e.clientX - d.startX) / zoom
-      const dy = (e.clientY - d.startY) / zoom
-      const next = d.base.map((el): EditorElement => {
-        if (el.id !== d.id) return el
-        if (d.mode === 'resize' && el.type === 'text') {
-          return { ...el, w: Math.max(40, (d.baseW ?? el.w) + dx) }
-        }
-        if (el.type === 'path') {
-          return { ...el, points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }
-        }
-        if (el.type === 'edit') return el
-        return { ...el, x: el.x + dx, y: el.y + dy }
-      })
-      els.setElementsNow(next)
-    }
-    const onUp = () => {
-      dragRef.current = null
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-    }
-  }, [zoom, els])
-
-  // ---- keyboard ----
-
-  const undo = useCallback(() => {
-    if (!els.undo()) return
-    setSelectedId(null)
-    setEditing(null)
-    setEditingElId(null)
-  }, [els, setEditing])
-
-  const redo = useCallback(() => {
-    if (!els.redo()) return
-    setSelectedId(null)
-    setEditing(null)
-    setEditingElId(null)
-  }, [els, setEditing])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      const editable =
-        !!t &&
-        (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !editable) {
-        e.preventDefault()
-        if (e.shiftKey) redo()
-        else undo()
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y' && !editable) {
-        e.preventDefault()
-        redo()
-        return
-      }
-      if (editable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId != null) {
-        e.preventDefault()
-        deleteSelected()
-      }
-      if (e.key === 'Escape') setSelectedId(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo, deleteSelected, selectedId])
+  useKeyboard(handleExport)
 
   useEffect(() => {
     if (!status) return
     const t = setTimeout(() => setStatus(null), 5000)
     return () => clearTimeout(t)
-  }, [status])
+  }, [status, setStatus])
 
-  // ---- toolbar actions ----
-
-  const selectTool = useCallback(
-    (id: ToolId) => {
-      commitLineEdit()
-      setEditingElId(null)
-      setToolState(id)
-      setSelectedId(null)
-    },
-    [commitLineEdit],
-  )
-
-  const selectedEl = els.elements.find((el) => el.id === selectedId)
-  let shownStyle: TextStyle = textStyle
-  if (editing) {
-    shownStyle = {
-      family: editing.font.family,
-      bold: editing.font.bold,
-      italic: editing.font.italic,
-      size: Math.round(editing.size),
-      color: editing.color,
-    }
-  } else if (selectedEl?.type === 'text') {
-    shownStyle = {
-      family: selectedEl.font.family,
-      bold: selectedEl.font.bold,
-      italic: selectedEl.font.italic,
-      size: selectedEl.size,
-      color: selectedEl.color,
-    }
-  } else if (selectedEl?.type === 'edit') {
-    const line = linesById[selectedEl.lineId]
-    const font = selectedEl.font ?? line?.font
-    shownStyle = {
-      family: font?.family ?? textStyle.family,
-      bold: font?.bold ?? false,
-      italic: font?.italic ?? false,
-      size: Math.round(selectedEl.size ?? line?.fontHeight ?? textStyle.size),
-      color: selectedEl.color,
-    }
-  }
-
-  const applyStyle = useCallback(
-    (patch: Partial<TextStyle>) => {
-      setTextStyle((s) => ({ ...s, ...patch }))
-      // An open line-edit session takes priority: restyle it live. (Bold and
-      // italic buttons keep the editor focused via preventDefault; the other
-      // controls blur it, which commits and falls into the selection branch.)
-      const session = editingRef.current
-      if (session) {
-        setEditing({
-          ...session,
-          font: {
-            family: patch.family ?? session.font.family,
-            bold: patch.bold ?? session.font.bold,
-            italic: patch.italic ?? session.font.italic,
-          },
-          size: patch.size ?? session.size,
-          color: patch.color ?? session.color,
-        })
-        return
-      }
-      if (selectedId == null) return
-      const sel = els.elementsRef.current.find((el) => el.id === selectedId)
-      if (!sel) return
-      els.commit((prev) =>
-        prev.map((el): EditorElement => {
-          if (el.id !== selectedId) return el
-          if (el.type === 'text') {
-            return {
-              ...el,
-              font: {
-                family: patch.family ?? el.font.family,
-                bold: patch.bold ?? el.font.bold,
-                italic: patch.italic ?? el.font.italic,
-              },
-              size: patch.size ?? el.size,
-              color: patch.color ?? el.color,
-            }
-          }
-          if (el.type === 'edit') {
-            const line = linesById[el.lineId]
-            const base = el.font ?? line?.font ?? { family: 'Helvetica' as const, bold: false, italic: false }
-            return {
-              ...el,
-              font: {
-                family: patch.family ?? base.family,
-                bold: patch.bold ?? base.bold,
-                italic: patch.italic ?? base.italic,
-              },
-              ...(patch.size != null ? { size: patch.size } : {}),
-              ...(patch.color != null ? { color: patch.color } : {}),
-            }
-          }
-          if (el.type === 'path' && patch.color != null) {
-            return { ...el, color: patch.color }
-          }
-          return el
-        }),
-      )
-    },
-    [selectedId, els, linesById, setEditing],
-  )
-
-  // Zoom can be an arbitrary fit-to-width value, so step to the nearest
-  // preset level in the requested direction.
-  const zoomStep = useCallback((dir: 1 | -1) => {
-    setZoom((z) => {
-      if (dir === 1) {
-        return ZOOM_LEVELS.find((l) => l > z + 0.01) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1]
-      }
-      return [...ZOOM_LEVELS].reverse().find((l) => l < z - 0.01) ?? ZOOM_LEVELS[0]
-    })
-  }, [])
-
-  const handleExport = useCallback(async () => {
-    commitLineEdit()
-    if (editingElId != null) finishElementEdit(editingElId)
-    if (!pdf.bytesRef.current || !pdf.docRef.current) return
-    setStatus({ type: 'info', msg: 'Preparing PDF…' })
-    try {
-      const out = await buildEditedPdf({
-        bytes: pdf.bytesRef.current,
-        pdfjsDoc: pdf.docRef.current,
-        elements: els.elementsRef.current,
-        linesById,
-      })
-      downloadBytes(out, `${pdf.fileName || 'document'}-edited.pdf`)
-      setStatus({ type: 'success', msg: 'PDF exported.' })
-    } catch (err) {
-      setStatus({ type: 'error', msg: `Export failed: ${(err as Error)?.message ?? err}` })
-    }
-  }, [commitLineEdit, editingElId, finishElementEdit, pdf, els, linesById])
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      const file = e.dataTransfer?.files?.[0]
-      if (file && /\.pdf$/i.test(file.name)) openFile(file)
-      else if (file) setStatus({ type: 'error', msg: 'Only PDF files are supported.' })
-    },
-    [openFile],
-  )
-
-  const handlers: PageHandlers = {
-    pagePointerDown: onPagePointerDown,
-    pagePointerMove: onPagePointerMove,
-    pagePointerUp: commitLiveDraw,
-    pagePointerLeave: commitLiveDraw,
-    lineClick: startLineEdit,
-    lineEditChange: (text) => {
-      if (editingRef.current) setEditing({ ...editingRef.current, text })
-    },
-    commitLineEdit,
-    cancelLineEdit: () => setEditing(null),
-    elementPointerDown: onElementPointerDown,
-    resizePointerDown: onResizePointerDown,
-    elementDoubleClick: (el) => {
-      if (el.type !== 'text') return
-      els.snapshotHistory()
-      setSelectedId(el.id)
-      setEditingElId(el.id)
-    },
-    elementTextChange: (id, text) => {
-      els.setElementsNow(
-        els.elementsRef.current.map((el) => (el.id === id ? { ...el, text } : el)),
-      )
-    },
-    finishElementEdit,
-  }
-
-  const activeTool = TOOLS.find((t) => t.id === tool)
-  const hasDoc = pdf.pages.length > 0
-  const editCount = els.elements.length
+  const hasDoc = pages.length > 0
   const docLabel = hasDoc
-    ? `${pdf.fileName || 'Untitled'} · ${pdf.pages.length} page${pdf.pages.length === 1 ? '' : 's'} · ${editCount} edit${editCount === 1 ? '' : 's'}`
+    ? `${fileName || 'Untitled'} · ${pages.length} page${pages.length === 1 ? '' : 's'} · ${elementCount} edit${elementCount === 1 ? '' : 's'}`
     : null
 
   return (
     <div className="app">
       <Toolbar
-        hasDoc={hasDoc}
-        tool={tool}
-        onSelectTool={selectTool}
-        style={shownStyle}
-        onStyle={applyStyle}
-        canUndo={els.canUndo}
-        canRedo={els.canRedo}
-        onUndo={undo}
-        onRedo={redo}
-        zoom={zoom}
-        onZoomStep={zoomStep}
-        docLabel={docLabel}
         onOpen={() => fileInputRef.current?.click()}
         onExport={handleExport}
+        right={docLabel ? <span className="doc-label">{docLabel}</span> : null}
       />
       <input
         ref={fileInputRef}
@@ -625,45 +79,18 @@ export default function App() {
         accept="application/pdf"
         hidden
         onChange={(e) => {
-          openFile(e.target.files?.[0])
+          handleOpen(e.target.files?.[0])
           e.target.value = ''
         }}
       />
 
-      {hasDoc && <div className="hintbar">{activeTool?.hint}</div>}
+      {hasDoc && <div className="hintbar">{toolById(tool)?.hint}</div>}
       {status && <div className={`notice ${status.type}`}>{status.msg}</div>}
-      {pdf.loading && <div className="notice info">Loading PDF…</div>}
+      {loading && <div className="notice info">Loading PDF…</div>}
 
-      <main className="workspace" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-        {!hasDoc && !pdf.loading && (
-          <div className="empty" onClick={() => fileInputRef.current?.click()}>
-            <span className="empty-logo-wrap">
-              <img className="empty-logo" src="/eight-mile-pdf-logo.png" alt="Eight Mile PDF logo" />
-            </span>
-            <h2>Open a PDF to start editing</h2>
-            <p>
-              Click here or drop a file. Click any text on the page to rewrite it — everything
-              stays in your browser.
-            </p>
-          </div>
-        )}
-        {pdf.pages.map((page) => (
-          <PageView
-            key={page.pageIndex}
-            page={page}
-            doc={pdf.docRef.current}
-            zoom={zoom}
-            tool={tool}
-            elements={els.elements}
-            linesById={linesById}
-            selectedId={selectedId}
-            editing={editing}
-            editingElId={editingElId}
-            liveDraw={liveDraw}
-            on={handlers}
-          />
-        ))}
-      </main>
+      <div className="body">
+        <Workspace onOpenFile={handleOpen} onPick={() => fileInputRef.current?.click()} />
+      </div>
     </div>
   )
 }

@@ -9,12 +9,16 @@ interface VariantFiles {
 }
 
 interface FamilyDef {
+  /** name shown in the font dropdown */
+  label: string
   /** css stack used for on-page preview (see @font-face in styles.css) */
   css: string
   /** built-in standard-14 fonts: [regular, bold, italic, boldItalic] */
   standard?: [StandardFonts, StandardFonts, StandardFonts, StandardFonts]
   /** TTFs served from public/fonts, embedded (subset) at export time */
   files?: VariantFiles
+  /** hidden from the dropdown (still selectable programmatically) */
+  hidden?: boolean
 }
 
 const files = (slug: string): VariantFiles => ({
@@ -24,8 +28,25 @@ const files = (slug: string): VariantFiles => ({
   boldItalic: `/fonts/${slug}-bolditalic.ttf`,
 })
 
+const single = (file: string): VariantFiles => ({
+  regular: file,
+  bold: file,
+  italic: file,
+  boldItalic: file,
+})
+
 export const FONT_FAMILIES: Record<FontFamily, FamilyDef> = {
+  // Metric-compatible substitutes: same advance widths as the commercial
+  // originals, so replacement text keeps the length of the run it covers.
+  Arimo: { label: 'Arimo (Arial)', css: "'Arimo', Arial, Helvetica, sans-serif", files: files('arimo') },
+  Tinos: { label: 'Tinos (Times)', css: "'Tinos', 'Times New Roman', serif", files: files('tinos') },
+  Cousine: { label: 'Cousine (Courier)', css: "'Cousine', 'Courier New', monospace", files: files('cousine') },
+  Carlito: { label: 'Carlito (Calibri)', css: "'Carlito', Calibri, sans-serif", files: files('carlito') },
+  Caladea: { label: 'Caladea (Cambria)', css: "'Caladea', Cambria, serif", files: files('caladea') },
+
+  // The standard 14. No embedding needed, but WinAnsi encoding only.
   Helvetica: {
+    label: 'Helvetica',
     css: 'Helvetica, Arial, sans-serif',
     standard: [
       StandardFonts.Helvetica,
@@ -35,6 +56,7 @@ export const FONT_FAMILIES: Record<FontFamily, FamilyDef> = {
     ],
   },
   Times: {
+    label: 'Times',
     css: '"Times New Roman", Times, serif',
     standard: [
       StandardFonts.TimesRoman,
@@ -44,6 +66,7 @@ export const FONT_FAMILIES: Record<FontFamily, FamilyDef> = {
     ],
   },
   Courier: {
+    label: 'Courier',
     css: '"Courier New", Courier, monospace',
     standard: [
       StandardFonts.Courier,
@@ -52,35 +75,67 @@ export const FONT_FAMILIES: Record<FontFamily, FamilyDef> = {
       StandardFonts.CourierBoldOblique,
     ],
   },
-  Roboto: { css: "'Roboto', sans-serif", files: files('roboto') },
-  'Open Sans': { css: "'Open Sans', sans-serif", files: files('opensans') },
-  Lato: { css: "'Lato', sans-serif", files: files('lato') },
-  Montserrat: { css: "'Montserrat', sans-serif", files: files('montserrat') },
-  Merriweather: { css: "'Merriweather', serif", files: files('merriweather') },
-  'Playfair Display': { css: "'Playfair Display', serif", files: files('playfair') },
+
+  Roboto: { label: 'Roboto', css: "'Roboto', sans-serif", files: files('roboto') },
+  'Open Sans': { label: 'Open Sans', css: "'Open Sans', sans-serif", files: files('opensans') },
+  Lato: { label: 'Lato', css: "'Lato', sans-serif", files: files('lato') },
+  Montserrat: { label: 'Montserrat', css: "'Montserrat', sans-serif", files: files('montserrat') },
+  Merriweather: { label: 'Merriweather', css: "'Merriweather', serif", files: files('merriweather') },
+  'Playfair Display': { label: 'Playfair Display', css: "'Playfair Display', serif", files: files('playfair') },
+  'Great Vibes': {
+    label: 'Great Vibes',
+    css: "'Great Vibes', cursive",
+    files: single('/fonts/greatvibes-regular.ttf'),
+  },
 }
 
-export const FAMILIES = Object.keys(FONT_FAMILIES) as FontFamily[]
+export const FAMILIES = (Object.keys(FONT_FAMILIES) as FontFamily[]).filter(
+  (f) => !FONT_FAMILIES[f].hidden,
+)
 
-// Map a PDF font name (e.g. "ABCDEF+TimesNewRomanPS-BoldItalicMT") plus the
-// pdf.js css family hint ("serif" | "sans-serif" | "monospace") onto one of
-// the standard families, so replacement text visually matches the original.
-// Native text always maps to the standard three; the custom families are
-// offered for user-added text and explicit overrides.
+export const familyLabel = (f: FontFamily): string => FONT_FAMILIES[f]?.label ?? f
+
+/**
+ * Map a PDF font name (e.g. "ABCDEF+TimesNewRomanPS-BoldItalicMT") plus the
+ * pdf.js css family hint ("serif" | "sans-serif" | "monospace") onto a bundled
+ * family, preferring one whose metrics match the original.
+ */
+const NAME_MAP: [RegExp, FontFamily][] = [
+  [/calibri|carlito/, 'Carlito'],
+  [/cambria|caladea/, 'Caladea'],
+  [/courier|cousine|mono|consolas|menlo|inconsolata|lucidaconsole/, 'Cousine'],
+  [/times|tinos|liberationserif|thorndale|nimbusroman|freeserif/, 'Tinos'],
+  [/georgia|gelasio|garamond|palatino|bookman|minion|charter|utopia|century|book ?antiqua|cambria ?math/, 'Tinos'],
+  [/arial|helvetica|arimo|liberationsans|albany|nimbussans|freesans|segoe|tahoma|verdana|geneva/, 'Arimo'],
+  [/roboto/, 'Roboto'],
+  [/opensans|open ?sans/, 'Open Sans'],
+  [/lato/, 'Lato'],
+  [/montserrat/, 'Montserrat'],
+  [/merriweather/, 'Merriweather'],
+  [/playfair/, 'Playfair Display'],
+]
+
 export function detectFont(rawName = '', familyHint = ''): FontSpec {
-  const name = String(rawName).toLowerCase()
+  const name = String(rawName).toLowerCase().replace(/^[a-z]{6}\+/i, '')
   const hint = String(familyHint).toLowerCase()
-  let family: FontFamily = 'Helvetica'
-  if (/courier|mono|consolas|menlo/.test(name) || /mono/.test(hint)) {
-    family = 'Courier'
-  } else if (
-    /times|georgia|garamond|palatino|cambria|bookman|minion|charter|utopia|century|roman/.test(name) ||
-    (/serif/.test(hint) && !/sans/.test(hint))
-  ) {
-    family = 'Times'
+
+  let family: FontFamily | null = null
+  for (const [re, fam] of NAME_MAP) {
+    if (re.test(name)) {
+      family = fam
+      break
+    }
   }
-  const bold = /bold|black|heavy|semibold|demibold|extrabold|ultra/.test(name)
-  const italic = /italic|oblique/.test(name)
+  if (!family) {
+    if (/mono/.test(hint)) family = 'Cousine'
+    else if (/serif/.test(hint) && !/sans/.test(hint)) family = 'Tinos'
+    else family = 'Arimo'
+  }
+
+  // "semibold"/"demibold" read as bold; "light"/"thin" never do. Order matters
+  // because many names contain both a weight word and "italic".
+  const bold = /bold|black|heavy|semibold|demibold|extrabold|ultra|\bbd\b/.test(name) && !/semibolditalicdisabled/.test(name)
+  const italic = /italic|oblique|\bit\b/.test(name)
   return { family, bold, italic }
 }
 
@@ -117,6 +172,7 @@ let measureCanvas: HTMLCanvasElement | null = null
 
 /** Width in px of `text` rendered with the css approximation of `fontSpec`. */
 export function measureText(text: string, fontSizePx: number, fontSpec: FontSpec): number {
+  if (typeof document === 'undefined') return text.length * fontSizePx * 0.5
   if (!measureCanvas) measureCanvas = document.createElement('canvas')
   const ctx = measureCanvas.getContext('2d')
   if (!ctx) return 0

@@ -17,8 +17,12 @@ npm install
 npm run dev                       # the editor on :5173
 
 cd server && npm install
-npm run dev                       # the account API on :3000
+DATABASE_PATH=./dev.db SECURE_COOKIES=false MAIL_TRANSPORT=json \
+  npm run dev                     # the account API on :3000
 ```
+
+`DATABASE_PATH` defaults to `/data/app.db`, the production volume, which does
+not exist on a development machine.
 
 The dev server proxies `/api` to `http://localhost:3000`; set
 `API_PROXY_TARGET` to point somewhere else. Without `SMTP_HOST`, or with

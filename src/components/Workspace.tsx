@@ -66,7 +66,7 @@ export default function Workspace({ onOpenFile, onPick }: Props) {
           <span className="empty-logo-wrap">
             <img className="empty-logo" src="/eight-mile-pdf-logo.png" alt="Eight Mile PDF logo" />
           </span>
-          <h2>Open a PDF to start editing</h2>
+          <h2>{document.documentElement.dataset.heading ?? 'Open a PDF to start editing'}</h2>
           <p>
             Click here or drop a file. Click any text on the page to rewrite it — your file stays
             in your browser.

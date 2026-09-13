@@ -80,13 +80,24 @@ export default function App() {
     void useAuth.getState().refresh()
   }, [])
 
+  // A task page (/redact-pdf and friends) names the tool it is about.
+  useEffect(() => {
+    const wanted = document.documentElement.dataset.tool
+    if (wanted && toolById(wanted)) useStore.getState().setTool(wanted)
+  }, [])
+
+  // The crawlable copy below the editor is for arriving, not for editing.
+  const hasDoc = pages.length > 0
+  useEffect(() => {
+    document.body.classList.toggle('has-doc', hasDoc)
+  }, [hasDoc])
+
   useEffect(() => {
     if (!status) return
     const t = setTimeout(() => setStatus(null), 5000)
     return () => clearTimeout(t)
   }, [status, setStatus])
 
-  const hasDoc = pages.length > 0
   const docLabel = hasDoc
     ? `${fileName || 'Untitled'} · ${pages.length} page${pages.length === 1 ? '' : 's'} · ${elementCount} edit${elementCount === 1 ? '' : 's'}`
     : null

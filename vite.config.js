@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { seoPages } from './src/seo/plugin'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), seoPages()],
   server: {
     // The API runs as its own container in production, behind the same origin.
     proxy: { '/api': process.env.API_PROXY_TARGET || 'http://localhost:3000' },

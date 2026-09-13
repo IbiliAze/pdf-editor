@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /verify
+Disallow: /reset
+Disallow: /api/
+
+Sitemap: https://pdf-editor.eightmile.co.uk/sitemap.xml

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
+import { createAssetsSlice } from './assetsSlice'
 import { createDocumentSlice } from './documentSlice'
 import { createEditorSlice } from './editorSlice'
 import { createElementsSlice } from './elementsSlice'
@@ -11,6 +12,7 @@ export const useStore = create<EditorStore>()((...a) => ({
   ...createElementsSlice(...a),
   ...createEditorSlice(...a),
   ...createUiSlice(...a),
+  ...createAssetsSlice(...a),
 }))
 
 /** Synchronous access for event handlers and async work. */

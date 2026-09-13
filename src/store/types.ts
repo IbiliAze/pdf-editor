@@ -27,6 +27,23 @@ export interface PageText {
   blocks: TextBlock[]
 }
 
+export interface ImageAsset {
+  id: string
+  bytes: ArrayBuffer
+  mime: 'image/png' | 'image/jpeg'
+  /** object URL for on-page preview */
+  url: string
+  width: number
+  height: number
+}
+
+export interface AssetsSlice {
+  assets: Record<string, ImageAsset>
+  addAsset: (asset: ImageAsset) => void
+  getAsset: (id: string) => ImageAsset | undefined
+  clearAssets: () => void
+}
+
 export interface ShapeStyle {
   stroke: string
   strokeWidth: number
@@ -118,4 +135,4 @@ export interface UiSlice {
   setShowFormFields: (v: boolean) => void
 }
 
-export type EditorStore = DocumentSlice & ElementsSlice & EditorSlice & UiSlice
+export type EditorStore = DocumentSlice & ElementsSlice & EditorSlice & UiSlice & AssetsSlice

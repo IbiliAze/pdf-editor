@@ -9,6 +9,7 @@ import { toolById } from './features/registry'
 import { downloadPdf } from './actions/exportPdf'
 import { AccountMenu, AuthModal, gatedDownload, useAuth } from './features/auth'
 import { PageSidebar } from './features/pages'
+import { SignatureHost } from './features/signatures'
 import { clamp } from './lib/colors'
 
 export default function App() {
@@ -100,6 +101,7 @@ export default function App() {
       </div>
 
       <AuthModal />
+      <SignatureHost />
     </div>
   )
 }

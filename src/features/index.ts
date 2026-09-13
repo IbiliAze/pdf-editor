@@ -4,3 +4,6 @@
  */
 import './text-edit'
 import './annotate'
+import './images'
+import './shapes'
+import './signatures'

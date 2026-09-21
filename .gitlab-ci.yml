@@ -19,11 +19,14 @@ default:
 
 .node: &node
   before_script:
+    # Node 22, the same major as the API image. The check is on the version
+    # rather than the presence of npm: the runner keeps whatever it was given
+    # first, so a guard on npm alone leaves an old major in place for good.
     - |
-      if ! command -v npm >/dev/null 2>&1; then
+      if [ "$(node --version 2>/dev/null | cut -d. -f1)" != "v22" ]; then
         sudo apt-get update
         sudo apt-get install -y ca-certificates curl
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
         sudo apt-get install -y nodejs
       fi
     - node --version
@@ -85,7 +88,7 @@ deploy:
     # image, so the image holds no secrets and a variable change needs no
     # rebuild, only a redeploy.
     - test -n "$PROD_ENV" || (echo "PROD_ENV is not set - see the note at the end of this file" && exit 1)
-    - sudo mkdir -p /opt/pdf-editor/dist /opt/pdf-editor/data
+    - sudo mkdir -p /opt/pdf-editor/dist
     - printf '%s\n' "$PROD_ENV" | sudo tee /opt/pdf-editor/api.env >/dev/null
     - sudo chmod 600 /opt/pdf-editor/api.env
 
@@ -95,7 +98,6 @@ deploy:
 
     # The API image is built here because the service is pinned to this node.
     - docker build -t pdf-editor-api:$TAG server/
-    - sudo chown -R 1000:1000 /opt/pdf-editor/data
     - API_IMAGE_TAG=$TAG docker stack deploy --resolve-image never -c docker-compose.yml pdf-editor
 
     - sudo cp pdf-editor.conf /opt/stacks/proxy/conf.d/
@@ -110,7 +112,10 @@ deploy:
 #   PROD_ENV   protected   The API's full environment file. Start from
 #                          server/api.env.example. Must set:
 #
-#                            DATABASE_PATH=/data/app.db
+#                            DB_HOST=proxysql
+#                            DB_PORT=6033
+#                            DB_NAME=pdf_editor
+#                            DB_USERNAME, DB_PASSWORD
 #                            APP_ORIGIN=https://pdf-editor.eightmile.co.uk
 #                            SECURE_COOKIES=true
 #                            TRUST_PROXY_HOPS=2
@@ -123,6 +128,18 @@ deploy:
 #
 #                          GitLab cannot mask a multi-line value, so mark it
 #                          Protected rather than Masked.
+#
+# The database itself is not created by the pipeline. Once, on the MySQL
+# server behind proxysql:
+#
+#   CREATE DATABASE pdf_editor CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+#   CREATE USER 'pdf_editor'@'%' IDENTIFIED BY '<password>';
+#   GRANT ALL ON pdf_editor.* TO 'pdf_editor'@'%';
+#
+# The API creates its own tables on first start, so the user needs DDL rights.
+# proxysql only forwards for users it knows, so the same user also has to be
+# added to its mysql_users table (LOAD MYSQL USERS TO RUNTIME; SAVE MYSQL USERS
+# TO DISK), or every connection is refused.
 #
 # Changing it and re-running the pipeline is enough to redeploy: the
 # per-pipeline TAG guarantees Swarm notices. The file lands at

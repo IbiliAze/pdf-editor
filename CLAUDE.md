@@ -1,7 +1,7 @@
 # Eight Mile PDF
 
 A PDF editor that runs entirely in the browser (React, pdf.js, pdf-lib), plus a
-small account API in `server/` (Fastify, SQLite) that gates downloads. The
+small account API in `server/` (Fastify, MySQL) that gates downloads. The
 README covers features, architecture and deploy. This file is what to keep in
 mind while changing the code.
 
@@ -21,13 +21,19 @@ npm run lint && npm test && npm run build      # all must pass
 npx vitest run src/lib/__tests__/textLayer.test.ts
 
 cd server
-DATABASE_PATH=./dev.db SECURE_COOKIES=false MAIL_TRANSPORT=json npm run dev   # API on :3000
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=pdf_editor_dev DB_USERNAME=root \
+  DB_PASSWORD=rootpass SECURE_COOKIES=false MAIL_TRANSPORT=json npm run dev   # API on :3000
 npm run typecheck && npm test                  # all must pass
 ```
 
-- `DATABASE_PATH` defaults to `/data/app.db`, the production volume. It does not
-  exist on a development machine, so the API will not start without the
-  override.
+- The API needs MySQL 8. The `DB_*` defaults are production — `proxysql:6033`
+  on the swarm's `db-network` — so a development machine must override them,
+  and the database has to exist (`CREATE DATABASE pdf_editor_dev CHARACTER SET
+  utf8mb4 COLLATE utf8mb4_0900_ai_ci`). The API creates its own tables.
+- The server has no database tests: MySQL has no in-memory mode and a test
+  server was judged more machinery than this app is worth. `server/src/test/`
+  covers configuration only, so anything touching a route or a query is
+  verified by running it.
 - With `MAIL_TRANSPORT=json` the confirmation and reset links are printed to the
   API's console instead of sent.
 - `APP_ORIGIN` must be the exact origin the editor is served from (default
@@ -70,6 +76,13 @@ contracts.
   per-route rate limit, and never reveal whether an email address is registered.
   Session ids and email tokens are stored as sha256 hashes. Migrations in
   `server/src/migrations.ts` are append-only.
+- Every query goes through `all`, `one` or `run` in `server/src/db.ts`, which
+  bind their parameters. The one value built into SQL is the `LIMIT` in
+  `routes/downloads.ts`, because MySQL rejects a bound placeholder there; it is
+  forced to a whole number in range first.
+- Timestamps are UTC: columns are `DATETIME`, the session time zone is pinned to
+  `+00:00`, SQL uses `UTC_TIMESTAMP()`, and the pool is in `dateStrings` mode so
+  a row's `created_at` reaches the browser as the same string it always was.
 - Comments explain why, not what. UI copy is plain, second person, British
   spelling.
 
@@ -108,9 +121,9 @@ It generates fixture PDFs, runs the real app in Chrome, and inspects the
 downloaded file with poppler.
 
 Downloads need a confirmed account. Seed one with the skill's
-`seed-account.mjs` instead of signing in over and over: login is limited to 10
-attempts per 15 minutes per client address, and a run of 429s looks exactly like
-a broken app.
+`seed-account.mjs` (after `reset-db.mjs`) instead of signing in over and over:
+login is limited to 10 attempts per 15 minutes per client address, and a run of
+429s looks exactly like a broken app.
 
 ## Deploy
 
@@ -118,5 +131,8 @@ GitLab CI (`.gitlab-ci.yml`) lints, tests, builds and deploys the swarm stack.
 Don't run deploy steps from a development machine. The API's environment is
 the protected `PROD_ENV` CI/CD variable (the whole env file; keys listed at the
 end of `.gitlab-ci.yml`), which the pipeline writes to
-`/opt/pdf-editor/api.env` on the manager. `/opt/pdf-editor/data` is the
-accounts database.
+`/opt/pdf-editor/api.env` on the manager. The accounts live in the shared
+MySQL, reached through `proxysql:6033` on `db-network`; nothing under
+`/opt/pdf-editor` holds data. The database, its user and that user's entry in
+proxysql are created by hand once — the statements are at the end of
+`.gitlab-ci.yml`.

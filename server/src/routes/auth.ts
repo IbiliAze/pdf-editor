@@ -55,10 +55,10 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   const link = (path: string, token: string) =>
     `${config.APP_ORIGIN}${path}?token=${encodeURIComponent(token)}`
 
-  const startSession = (userId: number, req: { headers: Record<string, unknown> }, reply: {
+  const startSession = async (userId: number, req: { headers: Record<string, unknown> }, reply: {
     setCookie: (n: string, v: string, o: object) => unknown
   }, ip: string) => {
-    const session = createSession(
+    const session = await createSession(
       db,
       userId,
       config.SESSION_TTL_DAYS,
@@ -80,25 +80,25 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
       const { email, password, marketingOptIn, source } = parsed.data
 
-      const existing = findUserByEmail(db, email)
+      const existing = await findUserByEmail(db, email)
       if (existing) {
         // Do not reveal that the address is taken: mail the owner instead.
-        const token = createEmailToken(db, existing.id, 'reset', RESET_TTL_MINUTES)
+        const token = await createEmailToken(db, existing.id, 'reset', RESET_TTL_MINUTES)
         await mailer
           .sendAlreadyRegistered(existing.email, link('/reset', token))
           .catch((err) => app.log.warn({ err }, 'already-registered mail failed'))
         return reply.code(201).send({ ok: true, verified: false })
       }
 
-      const user = createUser(db, email, await hashPassword(password), {
+      const user = await createUser(db, email, await hashPassword(password), {
         marketingOptIn,
         signupSource: source,
       })
-      const token = createEmailToken(db, user.id, 'verify', VERIFY_TTL_MINUTES)
+      const token = await createEmailToken(db, user.id, 'verify', VERIFY_TTL_MINUTES)
       await mailer
         .sendVerification(user.email, link('/verify', token))
         .catch((err) => app.log.error({ err }, 'verification mail failed'))
-      startSession(user.id, req, reply, clientIp(req))
+      await startSession(user.id, req, reply, clientIp(req))
       return reply.code(201).send({ ok: true, user: publicUser(user) })
     },
   )
@@ -110,19 +110,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       const parsed = parse(credentials, req.body)
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
       const { email, password } = parsed.data
-      const user = findUserByEmail(db, email)
+      const user = await findUserByEmail(db, email)
       const ok = user ? await verifyPassword(password, user.password_hash) : false
       if (!user || !ok) {
         return reply.code(401).send({ error: 'bad_credentials', message: 'Email or password is incorrect.' })
       }
-      startSession(user.id, req, reply, clientIp(req))
+      await startSession(user.id, req, reply, clientIp(req))
       return reply.send({ ok: true, user: publicUser(user) })
     },
   )
 
   app.post('/api/auth/logout', async (req, reply) => {
     const secret = req.cookies?.[SESSION_COOKIE]
-    if (secret) deleteSession(db, secret)
+    if (secret) await deleteSession(db, secret)
     reply.clearCookie(SESSION_COOKIE, { path: '/' })
     return reply.send({ ok: true })
   })
@@ -140,8 +140,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       if (!req.user) return reply.code(401).send({ error: 'unauthenticated' })
       const parsed = parse(preferencesBody, req.body)
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
-      setMarketingOptIn(db, req.user.id, parsed.data.marketingOptIn)
-      return reply.send({ ok: true, user: publicUser(findUserByEmail(db, req.user.email)!) })
+      await setMarketingOptIn(db, req.user.id, parsed.data.marketingOptIn)
+      return reply.send({ ok: true, user: publicUser((await findUserByEmail(db, req.user.email))!) })
     },
   )
 
@@ -151,17 +151,17 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const parsed = parse(tokenOnly, req.body)
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
-      const user = consumeEmailToken(db, parsed.data.token, 'verify')
+      const user = await consumeEmailToken(db, parsed.data.token, 'verify')
       if (!user) {
         return reply
           .code(400)
           .send({ error: 'bad_token', message: 'That confirmation link has expired or was already used.' })
       }
-      markVerified(db, user.id)
+      await markVerified(db, user.id)
       // Signing the visitor in here is what makes clicking the link in another
       // tab or on another device finish the job.
-      startSession(user.id, req, reply, clientIp(req))
-      const fresh = findUserByEmail(db, user.email)!
+      await startSession(user.id, req, reply, clientIp(req))
+      const fresh = (await findUserByEmail(db, user.email))!
       // Told once, on the first confirmation only: a reset link also verifies
       // but goes through reset-password, not here.
       if (!user.verified_at) {
@@ -179,7 +179,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       if (!req.user) return reply.code(401).send({ error: 'unauthenticated' })
       if (req.user.verified_at) return reply.send({ ok: true, alreadyVerified: true })
-      const token = createEmailToken(db, req.user.id, 'verify', VERIFY_TTL_MINUTES)
+      const token = await createEmailToken(db, req.user.id, 'verify', VERIFY_TTL_MINUTES)
       await mailer
         .sendVerification(req.user.email, link('/verify', token))
         .catch((err) => app.log.error({ err }, 'verification mail failed'))
@@ -202,7 +202,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: 'bad_credentials', message: 'That password is not right.' })
       }
       const { id, email } = req.user
-      deleteUser(db, id)
+      await deleteUser(db, id)
       req.user = undefined
       reply.clearCookie(SESSION_COOKIE, { path: '/' })
       await mailer
@@ -218,9 +218,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const parsed = parse(emailOnly, req.body)
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
-      const user = findUserByEmail(db, parsed.data.email)
+      const user = await findUserByEmail(db, parsed.data.email)
       if (user) {
-        const token = createEmailToken(db, user.id, 'reset', RESET_TTL_MINUTES)
+        const token = await createEmailToken(db, user.id, 'reset', RESET_TTL_MINUTES)
         await mailer
           .sendPasswordReset(user.email, link('/reset', token))
           .catch((err) => app.log.error({ err }, 'reset mail failed'))
@@ -239,19 +239,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         req.body,
       )
       if (!parsed.ok) return reply.code(400).send({ error: 'invalid', message: parsed.message })
-      const user = consumeEmailToken(db, parsed.data.token, 'reset')
+      const user = await consumeEmailToken(db, parsed.data.token, 'reset')
       if (!user) {
         return reply
           .code(400)
           .send({ error: 'bad_token', message: 'That reset link has expired or was already used.' })
       }
-      setPassword(db, user.id, await hashPassword(parsed.data.password))
+      await setPassword(db, user.id, await hashPassword(parsed.data.password))
       // Anyone holding an old session is logged out, including an attacker.
-      deleteAllSessions(db, user.id)
+      await deleteAllSessions(db, user.id)
       // Using a reset link proves the address works.
-      markVerified(db, user.id)
-      startSession(user.id, req, reply, clientIp(req))
-      return reply.send({ ok: true, user: publicUser(findUserByEmail(db, user.email)!) })
+      await markVerified(db, user.id)
+      await startSession(user.id, req, reply, clientIp(req))
+      return reply.send({ ok: true, user: publicUser((await findUserByEmail(db, user.email))!) })
     },
   )
 }

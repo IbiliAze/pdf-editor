@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { one, run } from './db.js'
 import type { Db } from './db.js'
 
 export const BCRYPT_ROUNDS = 12
@@ -45,36 +46,38 @@ export function safeEqual(a: string, b: string): boolean {
 
 const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19)
 
-export function findUserByEmail(db: Db, email: string): User | undefined {
-  return db.prepare('SELECT * FROM users WHERE email = ?').get(email) as User | undefined
+export function findUserByEmail(db: Db, email: string): Promise<User | undefined> {
+  return one<User>(db, 'SELECT * FROM users WHERE email = ?', [email])
 }
 
-export function findUserById(db: Db, id: number): User | undefined {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined
+export function findUserById(db: Db, id: number): Promise<User | undefined> {
+  return one<User>(db, 'SELECT * FROM users WHERE id = ?', [id])
 }
 
-export function createUser(
+export async function createUser(
   db: Db,
   email: string,
   passwordHash: string,
   extras: SignupExtras = {},
-): User {
+): Promise<User> {
   const optIn = extras.marketingOptIn ? 1 : 0
-  const info = db
-    .prepare(
-      `INSERT INTO users (email, password_hash, marketing_opt_in, marketing_opt_in_at, signup_source)
-       VALUES (?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') END, ?)`,
-    )
-    .run(email, passwordHash, optIn, optIn, extras.signupSource ?? null)
-  return findUserById(db, Number(info.lastInsertRowid))!
+  const result = await run(
+    db,
+    `INSERT INTO users (email, password_hash, marketing_opt_in, marketing_opt_in_at, signup_source)
+     VALUES (?, ?, ?, CASE WHEN ? = 1 THEN UTC_TIMESTAMP() END, ?)`,
+    [email, passwordHash, optIn, optIn, extras.signupSource ?? null],
+  )
+  return (await findUserById(db, result.insertId))!
 }
 
-export function setMarketingOptIn(db: Db, userId: number, on: boolean): void {
-  db.prepare(
+export async function setMarketingOptIn(db: Db, userId: number, on: boolean): Promise<void> {
+  await run(
+    db,
     `UPDATE users SET marketing_opt_in = ?,
-       marketing_opt_in_at = CASE WHEN ? = 1 THEN datetime('now') END
+       marketing_opt_in_at = CASE WHEN ? = 1 THEN UTC_TIMESTAMP() END
      WHERE id = ?`,
-  ).run(on ? 1 : 0, on ? 1 : 0, userId)
+    [on ? 1 : 0, on ? 1 : 0, userId],
+  )
 }
 
 export interface CreatedSession {
@@ -82,82 +85,94 @@ export interface CreatedSession {
   expiresAt: Date
 }
 
-export function createSession(
+export async function createSession(
   db: Db,
   userId: number,
   ttlDays: number,
   ip?: string,
   userAgent?: string,
-): CreatedSession {
+): Promise<CreatedSession> {
   const secret = newSecret()
   const expiresAt = new Date(Date.now() + ttlDays * 86400_000)
-  db.prepare(
+  await run(
+    db,
     `INSERT INTO sessions (id_hash, user_id, expires_at, last_seen_at, ip, user_agent)
-     VALUES (?, ?, ?, datetime('now'), ?, ?)`,
-  ).run(hashSecret(secret), userId, iso(expiresAt), ip ?? null, userAgent ?? null)
+     VALUES (?, ?, ?, UTC_TIMESTAMP(), ?, ?)`,
+    [hashSecret(secret), userId, iso(expiresAt), ip ?? null, userAgent ?? null],
+  )
   return { secret, expiresAt }
 }
 
-export function userForSession(db: Db, secret: string): User | undefined {
-  const row = db
-    .prepare(`SELECT * FROM sessions WHERE id_hash = ? AND expires_at > datetime('now')`)
-    .get(hashSecret(secret)) as SessionRow | undefined
-  if (!row) return undefined
-  db.prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE id_hash = ?`).run(
-    row.id_hash,
+export async function userForSession(db: Db, secret: string): Promise<User | undefined> {
+  const row = await one<SessionRow>(
+    db,
+    'SELECT * FROM sessions WHERE id_hash = ? AND expires_at > UTC_TIMESTAMP()',
+    [hashSecret(secret)],
   )
+  if (!row) return undefined
+  await run(db, 'UPDATE sessions SET last_seen_at = UTC_TIMESTAMP() WHERE id_hash = ?', [
+    row.id_hash,
+  ])
   return findUserById(db, row.user_id)
 }
 
-export function deleteSession(db: Db, secret: string): void {
-  db.prepare('DELETE FROM sessions WHERE id_hash = ?').run(hashSecret(secret))
+export async function deleteSession(db: Db, secret: string): Promise<void> {
+  await run(db, 'DELETE FROM sessions WHERE id_hash = ?', [hashSecret(secret)])
 }
 
-export function deleteAllSessions(db: Db, userId: number): void {
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+export async function deleteAllSessions(db: Db, userId: number): Promise<void> {
+  await run(db, 'DELETE FROM sessions WHERE user_id = ?', [userId])
 }
 
 export type TokenKind = 'verify' | 'reset'
 
-export function createEmailToken(
+export async function createEmailToken(
   db: Db,
   userId: number,
   kind: TokenKind,
   ttlMinutes: number,
-): string {
+): Promise<string> {
   // One live token of each kind per user keeps old links from piling up.
-  db.prepare(
-    `UPDATE email_tokens SET used_at = datetime('now')
+  await run(
+    db,
+    `UPDATE email_tokens SET used_at = UTC_TIMESTAMP()
      WHERE user_id = ? AND kind = ? AND used_at IS NULL`,
-  ).run(userId, kind)
+    [userId, kind],
+  )
   const secret = newSecret()
-  db.prepare(
+  await run(
+    db,
     'INSERT INTO email_tokens (token_hash, user_id, kind, expires_at) VALUES (?, ?, ?, ?)',
-  ).run(hashSecret(secret), userId, kind, iso(new Date(Date.now() + ttlMinutes * 60_000)))
+    [hashSecret(secret), userId, kind, iso(new Date(Date.now() + ttlMinutes * 60_000))],
+  )
   return secret
 }
 
-export function consumeEmailToken(db: Db, secret: string, kind: TokenKind): User | undefined {
+export async function consumeEmailToken(
+  db: Db,
+  secret: string,
+  kind: TokenKind,
+): Promise<User | undefined> {
   const hash = hashSecret(secret)
-  const row = db
-    .prepare(
-      `SELECT * FROM email_tokens
-       WHERE token_hash = ? AND kind = ? AND used_at IS NULL AND expires_at > datetime('now')`,
-    )
-    .get(hash, kind) as { user_id: number } | undefined
+  const row = await one<{ user_id: number }>(
+    db,
+    `SELECT * FROM email_tokens
+     WHERE token_hash = ? AND kind = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()`,
+    [hash, kind],
+  )
   if (!row) return undefined
-  db.prepare(`UPDATE email_tokens SET used_at = datetime('now') WHERE token_hash = ?`).run(hash)
+  await run(db, 'UPDATE email_tokens SET used_at = UTC_TIMESTAMP() WHERE token_hash = ?', [hash])
   return findUserById(db, row.user_id)
 }
 
-export function markVerified(db: Db, userId: number): void {
-  db.prepare(`UPDATE users SET verified_at = datetime('now') WHERE id = ? AND verified_at IS NULL`).run(
+export async function markVerified(db: Db, userId: number): Promise<void> {
+  await run(db, 'UPDATE users SET verified_at = UTC_TIMESTAMP() WHERE id = ? AND verified_at IS NULL', [
     userId,
-  )
+  ])
 }
 
-export function setPassword(db: Db, userId: number, passwordHash: string): void {
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId)
+export async function setPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
+  await run(db, 'UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId])
 }
 
 /**
@@ -165,14 +180,12 @@ export function setPassword(db: Db, userId: number, passwordHash: string): void 
  * reference the user with ON DELETE CASCADE, so this one statement takes
  * everything the server holds about them.
  */
-export function deleteUser(db: Db, userId: number): void {
-  db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+export async function deleteUser(db: Db, userId: number): Promise<void> {
+  await run(db, 'DELETE FROM users WHERE id = ?', [userId])
 }
 
 /** Housekeeping: drop expired sessions and spent tokens. */
-export function pruneExpired(db: Db): void {
-  db.prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`).run()
-  db.prepare(
-    `DELETE FROM email_tokens WHERE expires_at <= datetime('now', '-7 days')`,
-  ).run()
+export async function pruneExpired(db: Db): Promise<void> {
+  await run(db, 'DELETE FROM sessions WHERE expires_at <= UTC_TIMESTAMP()')
+  await run(db, 'DELETE FROM email_tokens WHERE expires_at <= UTC_TIMESTAMP() - INTERVAL 7 DAY')
 }

@@ -3,8 +3,16 @@ import { z } from 'zod'
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),
-  /** SQLite file; ":memory:" in tests */
-  DATABASE_PATH: z.string().default('/data/app.db'),
+  /**
+   * MySQL. The defaults are the production stack: proxysql on the shared
+   * db-network overlay. A development machine overrides host, port and
+   * credentials.
+   */
+  DB_HOST: z.string().default('proxysql'),
+  DB_PORT: z.coerce.number().int().positive().default(6033),
+  DB_NAME: z.string().default('pdf_editor'),
+  DB_USERNAME: z.string().min(1),
+  DB_PASSWORD: z.string().min(1),
   /** the site the app is served from; also the only accepted Origin */
   APP_ORIGIN: z.string().default('http://localhost:5173'),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),

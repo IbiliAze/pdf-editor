@@ -1,72 +1,79 @@
+import type { RowDataPacket } from 'mysql2/promise'
 import type { Db } from './db.js'
 
 /**
- * Ordered, append-only schema steps. Never edit a released entry: add a new
- * one. `schema_version` records how many have run.
+ * Ordered, append-only schema steps, each a list of statements. Never edit a
+ * released entry: add a new one. `schema_version` records how many have run.
+ *
+ * MySQL commits DDL implicitly, so a step that fails half way leaves the
+ * statements before it applied and the version unchanged. Write each step so
+ * re-running it after a failure is safe.
  */
-const MIGRATIONS: string[] = [
-  `
-  CREATE TABLE users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    verified_at   TEXT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  );
+const MIGRATIONS: string[][] = [
+  [
+    `CREATE TABLE IF NOT EXISTS users (
+      id                  INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      -- utf8mb4_0900_ai_ci is case-insensitive, so the unique key treats
+      -- Case@Example.com and case@example.com as the same address.
+      email               VARCHAR(254) NOT NULL UNIQUE,
+      password_hash       VARCHAR(255) NOT NULL,
+      verified_at         DATETIME NULL,
+      created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      marketing_opt_in    TINYINT NOT NULL DEFAULT 0,
+      marketing_opt_in_at DATETIME NULL,
+      signup_source       VARCHAR(300) NULL
+    ) ENGINE=InnoDB`,
 
-  CREATE TABLE sessions (
-    id_hash      TEXT PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-    expires_at   TEXT NOT NULL,
-    last_seen_at TEXT,
-    ip           TEXT,
-    user_agent   TEXT
-  );
-  CREATE INDEX sessions_user ON sessions(user_id);
+    // Session ids and email tokens are stored as sha256 hex, which is ASCII
+    // and must compare exactly, hence the binary collation.
+    `CREATE TABLE IF NOT EXISTS sessions (
+      id_hash      CHAR(64) COLLATE ascii_bin NOT NULL PRIMARY KEY,
+      user_id      INT UNSIGNED NOT NULL,
+      created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at   DATETIME NOT NULL,
+      last_seen_at DATETIME NULL,
+      ip           VARCHAR(45) NULL,
+      user_agent   VARCHAR(300) NULL,
+      KEY sessions_user (user_id),
+      CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
 
-  CREATE TABLE email_tokens (
-    token_hash TEXT PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind       TEXT NOT NULL CHECK (kind IN ('verify', 'reset')),
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    expires_at TEXT NOT NULL,
-    used_at    TEXT
-  );
-  CREATE INDEX email_tokens_user ON email_tokens(user_id, kind);
+    `CREATE TABLE IF NOT EXISTS email_tokens (
+      token_hash CHAR(64) COLLATE ascii_bin NOT NULL PRIMARY KEY,
+      user_id    INT UNSIGNED NOT NULL,
+      kind       ENUM('verify', 'reset') NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NOT NULL,
+      used_at    DATETIME NULL,
+      KEY email_tokens_user (user_id, kind),
+      CONSTRAINT email_tokens_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
 
-  CREATE TABLE downloads (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    filename   TEXT NOT NULL,
-    page_count INTEGER NOT NULL DEFAULT 0,
-    byte_size  INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE INDEX downloads_user ON downloads(user_id, created_at DESC);
-  `,
-  // Consent to hear from Eight Mile, given at signup and changeable from the
-  // account menu, plus where the visitor came from when they signed up.
-  `
-  ALTER TABLE users ADD COLUMN marketing_opt_in INTEGER NOT NULL DEFAULT 0;
-  ALTER TABLE users ADD COLUMN marketing_opt_in_at TEXT;
-  ALTER TABLE users ADD COLUMN signup_source TEXT;
-  `,
+    `CREATE TABLE IF NOT EXISTS downloads (
+      id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id    INT UNSIGNED NOT NULL,
+      filename   VARCHAR(300) NOT NULL,
+      page_count INT UNSIGNED NOT NULL DEFAULT 0,
+      byte_size  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY downloads_user (user_id, created_at DESC),
+      CONSTRAINT downloads_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB`,
+  ],
 ]
 
-export function migrate(db: Db): number {
-  db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)')
-  const row = db.prepare('SELECT version FROM schema_version LIMIT 1').get() as
-    | { version: number }
-    | undefined
-  let current = row?.version ?? 0
-  if (!row) db.prepare('INSERT INTO schema_version (version) VALUES (0)').run()
+export async function migrate(db: Db): Promise<number> {
+  await db.query(
+    'CREATE TABLE IF NOT EXISTS schema_version (version INT NOT NULL) ENGINE=InnoDB',
+  )
+  const [rows] = await db.query<RowDataPacket[]>('SELECT version FROM schema_version LIMIT 1')
+  const stored = rows[0] as { version: number } | undefined
+  let current = stored?.version ?? 0
+  if (!stored) await db.query('INSERT INTO schema_version (version) VALUES (0)')
 
   for (let i = current; i < MIGRATIONS.length; i++) {
-    db.transaction(() => {
-      db.exec(MIGRATIONS[i])
-      db.prepare('UPDATE schema_version SET version = ?').run(i + 1)
-    })()
+    for (const statement of MIGRATIONS[i]) await db.query(statement)
+    await db.query('UPDATE schema_version SET version = ?', [i + 1])
     current = i + 1
   }
   return current

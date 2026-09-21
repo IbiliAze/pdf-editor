@@ -1,6 +1,8 @@
 # PDF editor: a static React build served by nginx, plus a small account API.
 # Both are reached only through the reverse proxy on the shared overlay
-# (monitoring-network); neither publishes host ports.
+# (monitoring-network); neither publishes host ports. The API also joins
+# db-network to reach the shared MySQL through proxysql, the same way the other
+# stacks on this swarm do.
 #
 # Deploy on the manager:
 #   docker build -t pdf-editor-api:latest server/
@@ -37,14 +39,14 @@ services:
     # Built on the manager by CI and tagged with the pipeline id, so every
     # pipeline, even one that only changed a variable, restarts the service.
     image: pdf-editor-api:${API_IMAGE_TAG:-latest}
-    # Written by the pipeline from the PROD_ENV CI/CD variable.
+    # Written by the pipeline from the PROD_ENV CI/CD variable. It carries the
+    # DB_* settings, so the database credentials are never in this file or the
+    # image.
     env_file:
       - /opt/pdf-editor/api.env
-    volumes:
-      # SQLite database. Back this directory up.
-      - /opt/pdf-editor/data:/data
     networks:
       - monitoring-network
+      - db-network
     healthcheck:
       test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
@@ -56,7 +58,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          # SQLite and the image are both local to the manager.
+          # The image is built on the manager and never pushed to a registry.
           - node.role == manager
       restart_policy:
         condition: any
@@ -65,4 +67,7 @@ networks:
   # Created by the swarm/monitoring setup; shared with the reverse proxy so it
   # can reach these services by name (pdf-editor:80, pdf-editor-api:3000).
   monitoring-network:
+    external: true
+  # The shared database overlay. proxysql:6033 fronts MySQL on it.
+  db-network:
     external: true

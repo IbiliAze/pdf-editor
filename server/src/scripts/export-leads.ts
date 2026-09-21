@@ -2,11 +2,13 @@
  * Print the people who asked to hear from Eight Mile as CSV, for the mailing
  * tool. Verified accounts only, so every address has been confirmed.
  *
- *   DATABASE_PATH=./dev.db npm run leads:dev            # development
- *   docker exec <api container> npm run leads > leads.csv   # production
+ *   npm run leads:dev                                      # development
+ *   docker exec <api container> npm run leads > leads.csv  # production
+ *
+ * It reads the same DB_* settings as the API.
  */
 import { loadConfig } from '../config.js'
-import { openDb } from '../db.js'
+import { all, openDb } from '../db.js'
 
 interface LeadRow {
   email: string
@@ -21,17 +23,16 @@ const csv = (v: string | number | null) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-const db = openDb(loadConfig().DATABASE_PATH)
-const rows = db
-  .prepare(
-    `SELECT u.email, u.marketing_opt_in_at, u.signup_source, u.created_at,
-            (SELECT COUNT(*) FROM downloads d WHERE d.user_id = u.id) AS downloads
-     FROM users u
-     WHERE u.marketing_opt_in = 1 AND u.verified_at IS NOT NULL
-     ORDER BY u.marketing_opt_in_at`,
-  )
-  .all() as LeadRow[]
-db.close()
+const db = await openDb(loadConfig())
+const rows = await all<LeadRow>(
+  db,
+  `SELECT u.email, u.marketing_opt_in_at, u.signup_source, u.created_at,
+          (SELECT COUNT(*) FROM downloads d WHERE d.user_id = u.id) AS downloads
+   FROM users u
+   WHERE u.marketing_opt_in = 1 AND u.verified_at IS NOT NULL
+   ORDER BY u.marketing_opt_in_at`,
+)
+await db.end()
 
 const lines = ['email,opted_in_at,signup_source,downloads,created_at']
 for (const r of rows) {

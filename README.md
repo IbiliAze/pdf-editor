@@ -18,12 +18,17 @@ npm install
 npm run dev                       # the editor on :5173
 
 cd server && npm install
-DATABASE_PATH=./dev.db SECURE_COOKIES=false MAIL_TRANSPORT=json \
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=pdf_editor_dev \
+  DB_USERNAME=root DB_PASSWORD=rootpass \
+  SECURE_COOKIES=false MAIL_TRANSPORT=json \
   npm run dev                     # the account API on :3000
 ```
 
-`DATABASE_PATH` defaults to `/data/app.db`, the production volume, which does
-not exist on a development machine.
+The API needs MySQL 8. Create the database once
+(`CREATE DATABASE pdf_editor_dev CHARACTER SET utf8mb4 COLLATE
+utf8mb4_0900_ai_ci`) and the API creates its own tables on first start. The
+`DB_*` defaults are the production stack — `proxysql:6033` on the swarm's
+`db-network` — so a development machine has to override them.
 
 The dev server proxies `/api` to `http://localhost:3000`; set
 `API_PROXY_TARGET` to point somewhere else. Without `SMTP_HOST`, or with
@@ -188,7 +193,7 @@ Export picks one of two strategies:
 
 ## Accounts
 
-The API is Fastify with SQLite. Sessions and email tokens are stored as hashes,
+The API is Fastify with MySQL. Sessions and email tokens are stored as hashes,
 so a database leak is not a set of logins. Sign-up and password reset never
 reveal whether an address is registered. Auth routes are rate limited per
 client address, which is why both nginx hops forward the real one.
@@ -196,8 +201,8 @@ client address, which is why both nginx hops forward the real one.
 Account holders can delete their account from the account menu, confirming with
 their password. That deletes the user row, and with it, through `ON DELETE
 CASCADE`, every session, email token and download record. A confirmation is
-then sent to the address that was removed. Backups of `/opt/pdf-editor/data`
-keep a deleted account until they are rotated out.
+then sent to the address that was removed. Database backups keep a deleted
+account until they are rotated out.
 
 The download gate is a product decision, not a security boundary: every byte of
 the export is produced in the browser, so a determined visitor can always get
@@ -228,7 +233,8 @@ holder switch consent off, through `POST /api/auth/preferences`. To pull the
 opted-in, confirmed addresses as CSV for the mailing tool:
 
 ```sh
-cd server && DATABASE_PATH=./dev.db npm run leads:dev        # development
+cd server && DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=pdf_editor_dev \
+  DB_USERNAME=root DB_PASSWORD=rootpass npm run leads:dev     # development
 docker exec $(docker ps -qf name=pdf-editor_pdf-editor-api) npm run leads > leads.csv   # on the manager
 ```
 
@@ -258,7 +264,9 @@ deploys the `pdf-editor` swarm stack, and installs `pdf-editor.conf` into the
 shared proxy.
 
 Both services join the shared `monitoring-network` overlay and publish no host
-ports; the proxy reaches them as `pdf-editor:80` and `pdf-editor-api:3000`.
+ports; the proxy reaches them as `pdf-editor:80` and `pdf-editor-api:3000`. The
+API also joins `db-network` and reaches the shared MySQL through
+`proxysql:6033`, as the other stacks on the swarm do.
 
 The API's configuration comes from one protected CI/CD variable, `PROD_ENV`,
 holding the whole environment file (start from `server/api.env.example`; the
@@ -267,4 +275,9 @@ it to `/opt/pdf-editor/api.env` on the manager, mode 600, where the compose
 file mounts it. Change the variable and re-run the pipeline to redeploy: the
 image is tagged with the pipeline id, so Swarm always restarts the service.
 
-**Back up `/opt/pdf-editor/data`** — it is the accounts database.
+The `pdf_editor` database and its user are created by hand once, on the MySQL
+server, and the user must also be known to proxysql or every connection is
+refused. The statements are at the end of `.gitlab-ci.yml`.
+
+**The accounts live in the shared MySQL**, so they are covered by that server's
+backups. Nothing under `/opt/pdf-editor` holds data any more.

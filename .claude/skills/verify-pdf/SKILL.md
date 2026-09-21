@@ -47,9 +47,18 @@ instead. `APP_ORIGIN` must match the editor's URL exactly, or the API refuses
 writes with 403, and `API_PROXY_TARGET` points the editor's `/api` proxy at the
 API.
 
+The API needs MySQL. The scripts default to a local server on 3306 and the
+database `pdf_editor_verify`, which `reset-db.mjs` drops and recreates so each
+run starts empty. Override `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`
+and `DB_NAME` for a server with different credentials, and give both the
+scripts and the API the same values.
+
 ```sh
 API_PORT=3000 APP_PORT=5199
-(cd server && PORT=$API_PORT DATABASE_PATH=$SCRATCH/verify.db \
+export DB_HOST=127.0.0.1 DB_PORT=3306 DB_USERNAME=root DB_PASSWORD=rootpass \
+  DB_NAME=pdf_editor_verify
+node .claude/skills/verify-pdf/scripts/reset-db.mjs
+(cd server && PORT=$API_PORT \
   APP_ORIGIN=http://localhost:$APP_PORT SECURE_COOKIES=false MAIL_TRANSPORT=json \
   npx tsx src/index.ts > $SCRATCH/api.log 2>&1) &
 API_PROXY_TARGET=http://localhost:$API_PORT \
@@ -63,12 +72,12 @@ log.
 ## 4. A confirmed account
 
 ```sh
-node .claude/skills/verify-pdf/scripts/seed-account.mjs $SCRATCH/verify.db > $SCRATCH/session.json
+node .claude/skills/verify-pdf/scripts/seed-account.mjs > $SCRATCH/session.json
 ```
 
 This writes a confirmed user and a live session straight into the database and
 prints the session cookie, the email and the password. The API must have
-started once against that file so the schema exists. Signing in through the UI
+started once against that database so the schema exists. Signing in through the UI
 instead spends the login rate limit of 10 per 15 minutes, and a run of 429s
 looks exactly like a broken app.
 
@@ -128,4 +137,5 @@ even when it exits 0.
 ## 7. Clean up
 
 Stop the servers you started with `lsof -t -i :$API_PORT -i :$APP_PORT -sTCP:LISTEN | xargs kill`.
-Delete `$SCRATCH/verify.db` when you want a fresh account next time.
+Run `reset-db.mjs` again when you want a fresh account next time; it leaves
+the database there but empty.

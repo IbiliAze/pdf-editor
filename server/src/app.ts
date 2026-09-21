@@ -45,7 +45,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   })
 
   app.decorate('config', config)
-  app.decorate('db', openDb(config.DATABASE_PATH))
+  app.decorate('db', await openDb(config))
   app.decorate('mailer', createMailer(config))
   app.decorateRequest('user', undefined)
 
@@ -54,7 +54,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   app.addHook('onRequest', async (req) => {
     const secret = req.cookies?.[SESSION_COOKIE]
-    if (secret) req.user = userForSession(app.db, secret)
+    if (secret) req.user = await userForSession(app.db, secret)
   })
 
   // SameSite=Lax already blocks cross-site form posts; this also rejects
@@ -73,18 +73,14 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await registerDownloadRoutes(app)
 
   const prune = setInterval(() => {
-    try {
-      pruneExpired(app.db)
-    } catch (err) {
-      app.log.warn({ err }, 'prune failed')
-    }
+    void pruneExpired(app.db).catch((err) => app.log.warn({ err }, 'prune failed'))
   }, 3600_000)
   prune.unref?.()
 
   app.addHook('onClose', async () => {
     clearInterval(prune)
     try {
-      app.db.close()
+      await app.db.end()
     } catch {
       // already closed
     }

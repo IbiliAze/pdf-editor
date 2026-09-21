@@ -2,50 +2,45 @@
 // database, so an end-to-end run skips the email round trip and never spends
 // the login rate limit.
 //
-//   node seed-account.mjs <database> [email]
+//   node seed-account.mjs [email]
 //
-// Prints { email, password, cookie: { name, value } } as JSON. The API must have
-// started once against the same database, so the schema exists.
+// Prints { email, password, cookie: { name, value } } as JSON. Reads the same
+// DB_* variables as the API (see db.mjs). The API must have started once
+// against the same database, so the schema exists.
 import { createHash, randomBytes } from 'node:crypto'
 import { createRequire } from 'node:module'
+import { connect, settings } from './db.mjs'
 
-// better-sqlite3 and bcryptjs are the server's dependencies, not the app's.
 const require = createRequire(new URL('../../../../server/package.json', import.meta.url))
-const Database = require('better-sqlite3')
 const bcrypt = require('bcryptjs')
 
-const [dbPath, email = 'verify@example.com'] = process.argv.slice(2)
-if (!dbPath) {
-  console.error('usage: node seed-account.mjs <database> [email]')
-  process.exit(2)
-}
+const [email = 'verify@example.com'] = process.argv.slice(2)
+const db = await connect()
 
-const db = new Database(dbPath, { fileMustExist: true })
-db.pragma('foreign_keys = ON')
-const hasSchema = db
-  .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'`)
-  .get()
-if (!hasSchema) {
-  console.error(`${dbPath} has no users table. Start the API against it once first.`)
+const [tables] = await db.query('SHOW TABLES LIKE ?', ['users'])
+if (tables.length === 0) {
+  console.error(`${settings.database} has no users table. Start the API against it once first.`)
   process.exit(1)
 }
 
 const password = 'verify-pdf password'
-db.prepare(
-  `INSERT INTO users (email, password_hash, verified_at) VALUES (?, ?, datetime('now'))
-   ON CONFLICT(email) DO UPDATE SET
-     password_hash = excluded.password_hash,
-     verified_at = COALESCE(users.verified_at, datetime('now'))`,
-).run(email, bcrypt.hashSync(password, 10))
-const { id } = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+await db.execute(
+  `INSERT INTO users (email, password_hash, verified_at) VALUES (?, ?, UTC_TIMESTAMP())
+   ON DUPLICATE KEY UPDATE
+     password_hash = VALUES(password_hash),
+     verified_at = COALESCE(verified_at, UTC_TIMESTAMP())`,
+  [email, bcrypt.hashSync(password, 10)],
+)
+const [[{ id }]] = await db.execute('SELECT id FROM users WHERE email = ?', [email])
 
 // The same scheme as server/src/auth.ts: the cookie carries the secret and the
 // table stores its sha256.
 const secret = randomBytes(32).toString('base64url')
-db.prepare(
+await db.execute(
   `INSERT INTO sessions (id_hash, user_id, expires_at, last_seen_at)
-   VALUES (?, ?, datetime('now', '+1 day'), datetime('now'))`,
-).run(createHash('sha256').update(secret).digest('hex'), id)
-db.close()
+   VALUES (?, ?, UTC_TIMESTAMP() + INTERVAL 1 DAY, UTC_TIMESTAMP())`,
+  [createHash('sha256').update(secret).digest('hex'), id],
+)
+await db.end()
 
 console.log(JSON.stringify({ email, password, cookie: { name: 'em_session', value: secret } }))

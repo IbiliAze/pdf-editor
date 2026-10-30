@@ -55,6 +55,27 @@ test:api:
     - npm run typecheck
     - npm test
 
+# Dependency gate; deploy waits for it. audit-ci runs `npm audit` over
+# package-lock.json and server/package-lock.json, and fails on any high or critical
+# advisory in a production dependency that audit-ci.jsonc does not allowlist;
+# dev dependencies are skipped. It reads the lockfiles and asks the registry,
+# so it installs nothing of ours and builds nothing, and the checkout is
+# mounted read-only.
+test:audit:
+  stage: test
+  tags:
+    - app-primary
+  cache: []
+  only:
+    - main
+    - merge_requests
+  script:
+    - |
+      docker run --rm -v "$CI_PROJECT_DIR":/app:ro -w /app node:26.12.1-alpine sh -ec '
+        npx --yes audit-ci@7.1.0 --config audit-ci.jsonc
+        npx --yes audit-ci@7.1.0 --config audit-ci.jsonc --directory server
+      '
+
 build:
   <<: *node
   stage: build
@@ -78,6 +99,7 @@ deploy:
     - job: build
       artifacts: true
     - job: test:api
+    - job: test:audit
   script:
     # Unique tag per pipeline so Swarm always sees a new image reference and
     # redeploys, even when only a CI/CD variable changed and the commit didn't.

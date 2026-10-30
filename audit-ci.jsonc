@@ -1,0 +1,11 @@
+// Config for the test:audit CI job (audit-ci 7). The job fails on any high or
+// critical advisory in a production dependency that the allowlist does not
+// name; dev dependencies, the build and test tooling, are skipped. Give each
+// allowlist entry a comment saying why the advisory does not reach production,
+// and delete it as soon as the version it was written for is gone.
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "high": true,
+  "skip-dev": true,
+  "allowlist": []
+}

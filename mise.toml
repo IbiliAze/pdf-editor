@@ -1,0 +1,4 @@
+# Node 26.12.1 is the fixed release of the October 2026 Node.js security
+# update; npm comes with it.
+[tools]
+node = "26.12.1"

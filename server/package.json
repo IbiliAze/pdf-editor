@@ -1,10 +1,10 @@
 {
   "name": "pdf-editor-api",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=26.12.1"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -25,7 +25,7 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@types/node": "^22.20.2",
+    "@types/node": "^26",
     "@types/nodemailer": "^7.0.2",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",

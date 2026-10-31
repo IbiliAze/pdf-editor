@@ -18,19 +18,36 @@ default:
       - server/node_modules/
 
 .node: &node
+  variables:
+    # mise refuses an untrusted mise.toml, and the checkout is new every job.
+    MISE_TRUSTED_CONFIG_PATHS: $CI_PROJECT_DIR
+    MISE_YES: "1"
   before_script:
-    # Node 22, the same major as the API image. The check is on the version
-    # rather than the presence of npm: the runner keeps whatever it was given
-    # first, so a guard on npm alone leaves an old major in place for good.
+    # Node comes from mise.toml (26.12.1, the same version as the API image),
+    # not from the runner's own Node: this is a shell runner, and the host's
+    # apt Node is whatever it was given first. mise and its Node live in the
+    # gitlab-runner home, so only the first job downloads anything.
+    #
+    # The setup runs under a flock because jobs of one stage run side by side
+    # and apt and the mise installer must not run twice at once. libatomic1 is
+    # there because nodejs.org's Linux build, which mise installs, needs
+    # libatomic.so.1, and a Debian host that only had the apt nodejs may lack it.
+    - export PATH="$HOME/.local/bin:$PATH"
+    - mkdir -p "$HOME/.local/bin"
     - |
-      if [ "$(node --version 2>/dev/null | cut -d. -f1)" != "v22" ]; then
-        sudo apt-get update
-        sudo apt-get install -y ca-certificates curl
-        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-        sudo apt-get install -y nodejs
-      fi
-    - node --version
-    - npm --version
+      flock "$HOME/.local/bin/.mise-install.lock" bash -eo pipefail -c '
+        missing=""
+        command -v curl >/dev/null 2>&1 || missing="$missing ca-certificates curl"
+        dpkg -s libatomic1 >/dev/null 2>&1 || missing="$missing libatomic1"
+        if [ -n "$missing" ]; then
+          sudo apt-get update
+          sudo apt-get install -y $missing
+        fi
+        command -v mise >/dev/null 2>&1 || curl -fsSL https://mise.run | MISE_VERSION=v2026.10.25 sh
+      '
+    - mise install
+    - mise exec -- node --version
+    - mise exec -- npm --version
 
 test:app:
   <<: *node
@@ -39,9 +56,9 @@ test:app:
     - main
     - merge_requests
   script:
-    - npm ci
-    - npm run lint
-    - npm test
+    - mise exec -- npm ci
+    - mise exec -- npm run lint
+    - mise exec -- npm test
 
 test:api:
   <<: *node
@@ -51,9 +68,9 @@ test:api:
     - merge_requests
   script:
     - cd server
-    - npm ci
-    - npm run typecheck
-    - npm test
+    - mise exec -- npm ci
+    - mise exec -- npm run typecheck
+    - mise exec -- npm test
 
 # Dependency gate; deploy waits for it. audit-ci runs `npm audit` over
 # package-lock.json and server/package-lock.json, and fails on any high or critical
@@ -84,8 +101,8 @@ build:
   needs:
     - test:app
   script:
-    - npm ci
-    - npm run build
+    - mise exec -- npm ci
+    - mise exec -- npm run build
   artifacts:
     paths:
       - dist/
